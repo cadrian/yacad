@@ -25,6 +25,7 @@ The executor. There can be more than one; they register to the core by name; eac
 * Regularly asks the Core for tasks
     * runs those tasks
     * publishes results (artifacts or not, and sends results to Core)
+    * sends logs to the Core during its task execution
 * Answers to pings
 
 # CGI
@@ -32,4 +33,4 @@ The executor. There can be more than one; they register to the core by name; eac
 The gui.
 
 * Talks with the Core to manage the conf and the task list
-* Allow to download artifacts
+* Allow to download artifacts and task logs
