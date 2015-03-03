@@ -48,7 +48,7 @@ static void wait_and_run(yacad_scheduler_impl_t *this) {
      } while (event == NULL);
      do {
           poll(NULL, 0, event->get_timeout(event));
-          // TODO run event
+          event->run(event);
      } while (event->get_timeout(event) > 0);
      event->run(event);
 }
