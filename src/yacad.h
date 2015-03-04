@@ -22,4 +22,6 @@ typedef enum {
      true
 } bool_t;
 
+#define bool2str(flag) ((flag) ? "true" : "false")
+
 #endif /* __YACAD_H__ */

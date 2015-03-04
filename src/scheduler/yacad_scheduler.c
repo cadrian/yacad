@@ -14,6 +14,8 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <stdio.h>
+
 #include <cad_event_queue.h>
 
 #include "yacad_scheduler.h"
@@ -82,7 +84,7 @@ static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
      case STATE_RUNNING:
           return yacad_event_new_conf(this->conf);
      case STATE_STOPPING:
-          return yacad_event_new_action((yacad_event_action_fn)do_stop, 0, this);
+          return yacad_event_new_action((yacad_event_action)do_stop, 0, this);
      default:
           return NULL;
      }
@@ -98,8 +100,11 @@ static yacad_scheduler_t impl_fn = {
 yacad_scheduler_t *yacad_scheduler_new(yacad_conf_t *conf) {
      yacad_scheduler_impl_t *result = malloc(sizeof(yacad_scheduler_impl_t));
      result->fn = impl_fn;
-     result->tasklist = yacad_tasklist_new(result->conf->get_database_name(result->conf));
+     result->conf = conf;
+     result->state = STATE_INIT;
+     result->tasklist = yacad_tasklist_new(result->conf->get_database_name(conf));
      result->event_queue = cad_new_event_queue_pthread(stdlib_memory, (provide_data_fn)event_provider, 16);
      result->event_queue->start(result->event_queue, result);
+     result->state = STATE_RUNNING;
      return &(result->fn);
 }

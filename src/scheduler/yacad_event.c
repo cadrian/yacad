@@ -15,17 +15,19 @@
 */
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #include "yacad_event.h"
 
 typedef struct yacad_event_impl_s {
      yacad_event_t fn;
-     yacad_event_action_fn action;
+     yacad_event_action action;
      int timeout;
      void *data;
 } yacad_event_impl_t;
 
-static int get_timeout(yacad_event_impl_t*this) {
+static int get_timeout(yacad_event_impl_t *this) {
      return this->timeout;
 }
 
@@ -43,7 +45,7 @@ static yacad_event_t impl_fn = {
      .free = (yacad_event_free_fn)free_,
 };
 
-yacad_event_t *yacad_event_new_action(yacad_event_action_fn action, int timeout, void *data) {
+yacad_event_t *yacad_event_new_action(yacad_event_action action, int timeout, void *data) {
      yacad_event_impl_t *result = malloc(sizeof(yacad_event_impl_t));
      result->fn = impl_fn;
      result->action = action;
@@ -52,7 +54,12 @@ yacad_event_t *yacad_event_new_action(yacad_event_action_fn action, int timeout,
      return &(result->fn);
 }
 
+static void dummy(yacad_event_impl_t *this, void *data) {
+     printf("dummy\n");
+}
+
 yacad_event_t *yacad_event_new_conf(yacad_conf_t *conf) {
      // TODO
-     return NULL;
+     sleep(2);
+     return yacad_event_new_action((yacad_event_action)dummy, 1000, NULL);
 }

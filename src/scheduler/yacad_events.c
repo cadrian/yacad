@@ -14,6 +14,8 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <stdio.h>
+
 #include <cad_array.h>
 #include <cad_hash.h>
 #include <cad_events.h>
@@ -77,6 +79,7 @@ static void on_read(yacad_events_impl_t *this, on_event_action action, int fd, v
      event->action.event = action;
      event->data = data;
      this->on_read->set(this->on_read, &fd, event);
+     this->events->set_read(this->events, fd);
      this->count++;
 }
 
@@ -85,6 +88,7 @@ static void on_write(yacad_events_impl_t *this, on_event_action action, int fd, 
      event->action.event = action;
      event->data = data;
      this->on_write->set(this->on_write, &fd, event);
+     this->events->set_write(this->events, fd);
      this->count++;
 }
 
@@ -93,6 +97,7 @@ static void on_exception(yacad_events_impl_t *this, on_event_action action, int 
      event->action.event = action;
      event->data = data;
      this->on_exception->set(this->on_exception, &fd, event);
+     this->events->set_exception(this->events, fd);
      this->count++;
 }
 
@@ -111,6 +116,7 @@ static void cleanup(yacad_events_impl_t *this) {
      this->on_write->clean(this->on_write, (cad_hash_iterator_fn)clean_iterator, this);
      this->on_exception->clean(this->on_exception, (cad_hash_iterator_fn)clean_iterator, this);
      this->count = 0;
+     this->events->set_timeout(this->events, 1000000);
 }
 
 static bool_t step(yacad_events_impl_t *this) {
@@ -185,5 +191,6 @@ yacad_events_t *yacad_events_new(void) {
      result->events->on_read(result->events, (cad_on_descriptor_action)do_read);
      result->events->on_write(result->events, (cad_on_descriptor_action)do_write);
      result->events->on_exception(result->events, (cad_on_descriptor_action)do_exception);
+     cleanup(result);
      return &(result->fn);
 }
