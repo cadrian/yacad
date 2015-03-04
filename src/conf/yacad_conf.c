@@ -22,16 +22,35 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include <cad_hash.h>
+
 #include "yacad_conf.h"
+
+//static const char *dirs[] = {
+//     "/etc/xdg/yacad",
+//     "/etc/yacad",
+//     "/usr/local/etc/yacad",
+//     NULL
+//};
 
 typedef struct yacad_conf_impl_s {
      yacad_conf_t fn;
      const char *database_name;
      const char *action_script;
+     cad_hash_t *projects;
+     cad_hash_t *runners;
 } yacad_conf_impl_t;
 
 static const char *get_database_name(yacad_conf_impl_t *this) {
      return this->database_name;
+}
+
+static yacad_project_t *get_project(yacad_conf_impl_t *this, const char *project_name) {
+     return this->projects->get(this->projects, project_name);
+}
+
+static yacad_runner_t *get_runner(yacad_conf_impl_t *this, const char *runner_name) {
+     return this->runners->get(this->runners, runner_name);
 }
 
 static void free_(yacad_conf_impl_t *this) {
@@ -150,6 +169,8 @@ static yacad_task_t *next_task(yacad_conf_impl_t *this) {
 static yacad_conf_t impl_fn =  {
      .get_database_name = (yacad_conf_get_database_name_fn)get_database_name,
      .next_task = (yacad_conf_next_task_fn)next_task,
+     .get_project = (yacad_conf_get_project_fn)get_project,
+     .get_runner = (yacad_conf_get_runner_fn)get_runner,
      .free = (yacad_conf_free_fn)free_,
 };
 
@@ -158,5 +179,8 @@ yacad_conf_t *yacad_conf_new(void) {
      result->fn = impl_fn;
      result->database_name = "yacad.db";
      result->action_script = "yacad_scheduler.sh";
+     result->projects = cad_new_hash(stdlib_memory, cad_hash_strings);
+     result->runners = cad_new_hash(stdlib_memory, cad_hash_strings);
+     // TODO read conf
      return &(result->fn);
 }
