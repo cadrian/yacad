@@ -23,11 +23,13 @@ typedef struct yacad_scheduler_s yacad_scheduler_t;
 
 typedef bool_t (*yacad_scheduler_is_done_fn)(yacad_scheduler_t *this);
 typedef void (*yacad_scheduler_wait_and_run_fn)(yacad_scheduler_t *this);
+typedef void (*yacad_scheduler_stop_fn)(yacad_scheduler_t *this);
 typedef void (*yacad_scheduler_free_fn)(yacad_scheduler_t *this);
 
 struct yacad_scheduler_s {
      yacad_scheduler_is_done_fn is_done;
      yacad_scheduler_wait_and_run_fn wait_and_run;
+     yacad_scheduler_stop_fn stop;
      yacad_scheduler_free_fn free;
 };
 

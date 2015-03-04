@@ -31,6 +31,9 @@ struct yacad_event_s {
      yacad_event_free_fn free;
 };
 
-yacad_event_t *yacad_event_new(yacad_conf_t *conf);
+typedef void (*yacad_event_action_fn)(yacad_event_t *event, void *data);
+
+yacad_event_t *yacad_event_new_conf(yacad_conf_t *conf);
+yacad_event_t *yacad_event_new_action(yacad_event_action_fn action, int timeout, void *data);
 
 #endif /* __YACAD_EVENT_H__ */
