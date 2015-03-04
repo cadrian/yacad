@@ -14,13 +14,19 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "conf/yacad_conf.h"
 #include "scheduler/yacad_scheduler.h"
+#include "scheduler/yacad_events.h"
 
 int main(int argc, const char * const *argv) {
-     yacad_scheduler_t *scheduler = yacad_scheduler_new();
-     while (!scheduler->is_done(scheduler)) {
-          scheduler->wait_and_run(scheduler);
-     }
+     yacad_conf_t *conf = yacad_conf_new();
+     yacad_events_t *events = yacad_events_new();
+     yacad_scheduler_t *scheduler = yacad_scheduler_new(conf);
+     bool_t done = false;
+     do {
+          scheduler->prepare(scheduler, events);
+          done = !events->step(events);
+     } while (!done);
      scheduler->free(scheduler);
      return 0;
 }

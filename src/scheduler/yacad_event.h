@@ -26,7 +26,7 @@ typedef void (*yacad_event_run_fn)(yacad_event_t *this);
 typedef void (*yacad_event_free_fn)(yacad_event_t *this);
 
 struct yacad_event_s {
-     yacad_event_get_timeout_fn getçtimeout;
+     yacad_event_get_timeout_fn get_timeout;
      yacad_event_run_fn run;
      yacad_event_free_fn free;
 };

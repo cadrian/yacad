@@ -31,6 +31,6 @@ struct yacad_tasklist_s {
      yacad_tasklist_free_fn free;
 };
 
-yacad_task_t *yacad_tasklist_new(const char *database_name);
+yacad_tasklist_t *yacad_tasklist_new(const char *database_name);
 
 #endif /* __YACAD_TASKLIST_H__ */
