@@ -1,4 +1,10 @@
-# Core
+# Aim
+
+Light-weight continuous integration. Written in C. Must work on an ARM platform.
+
+# Design
+
+## Core
 
 The main program.
 
@@ -14,7 +20,7 @@ The main program.
 * Pings Runners
 * Manages the conf for the CGI (note: only Core conf; runner conf is not managed)
 
-# Runner
+## Runner
 
 The executor. There can be more than one; they register to the core by name; each name is unique.
 
@@ -28,7 +34,7 @@ The executor. There can be more than one; they register to the core by name; eac
     * sends logs to the Core during its task execution
 * Answers to pings
 
-# CGI
+## CGI
 
 The gui.
 
