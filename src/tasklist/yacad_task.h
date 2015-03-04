@@ -22,6 +22,7 @@ typedef struct yacad_task_s yacad_task_t;
 typedef int (*yacad_task_get_id_fn)(yacad_task_t *this);
 typedef const char *(*yacad_task_get_project_name_fn)(yacad_task_t *this);
 typedef const char *(*yacad_task_get_runner_name_fn)(yacad_task_t *this);
+typedef const char *(*yacad_task_get_action_fn)(yacad_task_t *this);
 
 typedef const char *(*yacad_task_serialize_fn)(yacad_task_t *this);
 typedef void (*yacad_task_free_fn)(yacad_task_t *this);
@@ -30,11 +31,12 @@ struct yacad_task_s {
      yacad_task_get_id_fn get_id;
      yacad_task_get_project_name_fn get_project_name;
      yacad_task_get_runner_name_fn get_runner_name;
+     yacad_task_get_action_fn get_action;
      yacad_task_serialize_fn serialize;
      yacad_task_free_fn free;
 };
 
 yacad_task_t *yacad_task_unserialize(const char *serial);
-yacad_task_t *yacad_task_new(int id, const char *project_name, const char *runner_name);
+yacad_task_t *yacad_task_new(int id, const char *project_name, const char *runner_name, const char *action);
 
 #endif /* __YACAD_TASK_H__ */
