@@ -1,0 +1,96 @@
+\batchmode
+\documentclass[a4paper,twoside,10pt]{book}
+\usepackage{fancyheadings}
+\usepackage{makeidx}
+\usepackage{natbib}
+\usepackage{graphicx}
+\usepackage{multicol}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{ifthen}
+\usepackage[table]{xcolor}
+\usepackage{textcomp}
+\usepackage{alltt}
+\usepackage{ifpdf}
+\ifpdf
+\usepackage[pdftex,
+            pagebackref=true,
+            colorlinks=true,
+            linkcolor=blue,
+            unicode
+           ]{hyperref}
+\else
+\usepackage[ps2pdf,
+            pagebackref=true,
+            colorlinks=true,
+            linkcolor=blue,
+            unicode
+           ]{hyperref}
+\usepackage{pspicture}
+\fi
+\usepackage[utf8]{inputenc}
+\usepackage{mathptmx}
+\usepackage{sectsty}
+\usepackage[titles]{tocloft}
+\usepackage{doxygen}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\lstset{language=C++,inputencoding=utf8,basicstyle=\footnotesize,breaklines=true,breakatwhitespace=true,tabsize=8,numbers=left }
+\usepackage{libertine}
+\usepackage{inconsolata}
+\allsectionsfont{\usefont{T1}{fxb}{bc}{n}\selectfont\color{darkgray}} % force again to override Doxygen defaults
+\renewcommand*\familydefault{\rmdefault}
+\makeindex
+\setcounter{tocdepth}{3}
+
+\renewcommand{\entrylabel}[1]{
+   {\parbox[b]{\labelwidth-4pt}{\makebox[0pt][l]{%
+   \usefont{T1}{fxb}{bc}{n}\color{darkgray}#1}\vspace{1.5\baselineskip}}}}
+
+%% fancyheader empty
+\providecommand{\clearemptydoublepage} % Style recto-verso
+   {\newpage \thispagestyle{empty} \cleardoublepage}
+
+\begin{document}
+\hypersetup{pageanchor=false,citecolor=blue}
+\begin{titlepage}
+  \vspace*{3cm}
+  \begin{center}
+    \begin{tabular}{p{10cm}}
+      \hline
+      \begin{minipage}[t]{10cm}
+        \begin{center}
+          \vspace*{2ex}
+          {\Huge\textsc{yaCAD}}
+
+          \vspace*{1ex}
+          {\small{(Yet Another)}} \\
+          {\Large\textsc{Continuous Automation Design}}
+
+          \vspace*{1ex}
+          Version \input{version}
+        \end{center}
+      \end{minipage}
+      \vspace{1ex}\\
+      \hline
+    \end{tabular}
+
+    \vspace*{8em}
+    {Cyril \textsc{Adrian} \small{\emph{aka} CAD}} \\
+    {\texttt{cyril.adrian@gmail.com}}
+
+    \vspace*{2cm}
+    \today
+
+    \vfill
+    \emph{\small Composed using Libertine fonts, Doxygen, and~\LaTeX~}
+  \end{center}
+\end{titlepage}
+\clearemptydoublepage
+\pagenumbering{roman}
+\tableofcontents
+\clearemptydoublepage
+\pagenumbering{arabic}
+\hypersetup{pageanchor=true,citecolor=blue}
+\newcommand{\+}{\discretionary{\mbox{\scriptsize$\hookleftarrow$}}{}{}}

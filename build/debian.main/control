@@ -1,0 +1,25 @@
+Source: exp
+Section: admin
+Priority: optional
+Maintainer: Cyril Adrian <cyril.adrian@gmail.com>
+Build-Depends: debhelper (>= 9), libcad-dev, libpcre3-dev, doxygen, texlive-fonts-extra
+Standards-Version: 3.9.5
+Homepage: https://github.com/cadrian/exp
+Vcs-Git: https://github.com/cadrian/exp.git
+Vcs-Browser: https://github.com/cadrian/exp
+
+Package: exp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libcad0, libpcre3
+Description: A log analyzer
+ A tool that helps analyze logs.
+
+Package: exp-doc
+Section: doc
+Architecture: all
+Depends: ${misc:Depends}
+Recommends: exp (= ${binary:Version})
+Description:  A log analyzer
+ A tool that helps analyze logs.
+ .
+ The documentation.
