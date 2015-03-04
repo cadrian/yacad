@@ -14,6 +14,9 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <stdio.h>
+#include <string.h>
+
 #include <cad_array.h>
 #include <cad_hash.h>
 
@@ -25,15 +28,40 @@ typedef struct yacad_tasklist_impl_s {
      cad_hash_t *tasklist_per_runner;
 } yacad_tasklist_impl_t;
 
+static bool_t same_task(yacad_task_t *task1, yacad_task_t *task2) {
+     bool_t result = true;
+     if (strcmp(task1->get_project_name(task1), task2->get_project_name(task2))) {
+          result = false;
+     } else if (strcmp(task1->get_runner_name(task1), task2->get_runner_name(task2))) {
+          result = false;
+     } else if (strcmp(task1->get_action(task1), task2->get_action(task2))) {
+          result = false;
+     }
+     return result;
+}
+
 static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
      const char *runner_name = task->get_runner_name(task);
      cad_array_t *tasklist = this->tasklist_per_runner->get(this->tasklist_per_runner, runner_name);
+     int i, n;
+     bool_t found = false;
      if (tasklist == NULL) {
           tasklist = cad_new_array(stdlib_memory);
           this->tasklist_per_runner->set(this->tasklist_per_runner, runner_name, tasklist);
      }
-     tasklist->insert(tasklist, tasklist->count(tasklist), task);
-     // TODO save to database
+     n = tasklist->count(tasklist);
+     for (i = 0; !found && i < n; i++) {
+          found = same_task(task, tasklist->get(tasklist, i));
+     }
+     if (found) {
+          printf("task not added: %s\n", task->serialize(task));
+          task->free(task);
+     } else {
+          tasklist->insert(tasklist, n, task);
+          printf("added task: %s\n", task->serialize(task));
+          // TODO if task.id == 0??
+          // TODO save to database
+     }
 }
 
 static yacad_task_t *get(yacad_tasklist_impl_t *this, const char *runner_name) {
@@ -46,7 +74,8 @@ static yacad_task_t *get(yacad_tasklist_impl_t *this, const char *runner_name) {
      return result;
 }
 
-static void free_tasklist(cad_hash_t *dict, int index, const char *runner_name, cad_array_t *tasklist, yacad_tasklist_impl_t *this) {
+static void free_tasklist(cad_hash_t *dict, int index, const char *runner_name, cad_array_t *tasklist,
+                          yacad_tasklist_impl_t *this) {
      int i, n = tasklist->count(tasklist);
      yacad_task_t *task;
      for (i = 0; i < n; i++) {

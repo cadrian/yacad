@@ -16,15 +16,16 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "yacad_task.h"
 
 typedef struct yacad_task_impl_s {
      yacad_task_t fn;
      int id;
-     const char *project_name;
-     const char *runner_name;
-     const char *action;
+     char *project_name;
+     char *runner_name;
+     char *action;
 } yacad_task_impl_t;
 
 static int get_id(yacad_task_impl_t *this) {
@@ -45,11 +46,15 @@ static const char *get_action(yacad_task_impl_t *this) {
 
 static const char *serialize(yacad_task_impl_t *this) {
      static char result[4096];
-     snprintf(result, 4096, "{'id':%d,'project':'%s','runner':'%s','action':'%s'}", this->id, this->project_name, this->runner_name,this->action);
+     snprintf(result, 4096, "{'id':%d,'project':'%s','runner':'%s','action':'%s'}",
+              this->id, this->project_name, this->runner_name,this->action);
      return result;
 }
 
 static void free_(yacad_task_impl_t *this) {
+     free(this->project_name);
+     free(this->runner_name);
+     free(this->action);
      free(this);
 }
 
@@ -71,8 +76,8 @@ yacad_task_t *yacad_task_new(int id, const char *project_name, const char *runne
      yacad_task_impl_t*result = malloc(sizeof(yacad_task_impl_t));
      result->fn = impl_fn;
      result->id = id;
-     result->project_name = project_name;
-     result->runner_name = runner_name;
-     result->action = action;
+     result->project_name = strdup(project_name);
+     result->runner_name = strdup(runner_name);
+     result->action = strdup(action);
      return &(result->fn);
 }

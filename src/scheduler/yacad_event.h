@@ -17,23 +17,24 @@
 #ifndef __YACAD_EVENT_H__
 #define __YACAD_EVENT_H__
 
+#include "yacad.h"
 #include "conf/yacad_conf.h"
+#include "tasklist/yacad_task.h"
 
 typedef struct yacad_event_s yacad_event_t;
 
-typedef int (*yacad_event_get_timeout_fn)(yacad_event_t *this);
 typedef void (*yacad_event_run_fn)(yacad_event_t *this);
 typedef void (*yacad_event_free_fn)(yacad_event_t *this);
 
 struct yacad_event_s {
-     yacad_event_get_timeout_fn get_timeout;
      yacad_event_run_fn run;
      yacad_event_free_fn free;
 };
 
-typedef void (*yacad_event_action)(yacad_event_t *event, void *data);
+typedef void (*yacad_event_callback)(yacad_event_t *event, yacad_task_t *task, void *data);
+typedef void (*yacad_event_action)(yacad_event_t *event, yacad_event_callback callback, void *data);
 
-yacad_event_t *yacad_event_new_conf(yacad_conf_t *conf);
-yacad_event_t *yacad_event_new_action(yacad_event_action action, int timeout, void *data);
+yacad_event_t *yacad_event_new_conf(yacad_conf_t *conf, yacad_event_callback callback, void *data);
+yacad_event_t *yacad_event_new_action(yacad_event_action action, yacad_event_callback callback, void *data);
 
 #endif /* __YACAD_EVENT_H__ */

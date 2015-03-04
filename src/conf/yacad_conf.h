@@ -17,13 +17,17 @@
 #ifndef __YACAD_CONF_H__
 #define __YACAD_CONF_H__
 
+#include "yacad.h"
+
 typedef struct yacad_conf_s yacad_conf_t;
 
 typedef const char *(*yacad_conf_get_database_name_fn)(yacad_conf_t *this);
+typedef const char *(*yacad_conf_get_action_script_fn)(yacad_conf_t *this);
 typedef void (*yacad_conf_free_fn)(yacad_conf_t *this);
 
 struct yacad_conf_s {
      yacad_conf_get_database_name_fn get_database_name;
+     yacad_conf_get_action_script_fn get_action_script;
      yacad_conf_free_fn free;
 };
 

@@ -78,11 +78,15 @@ static void do_stop(yacad_event_t *event, yacad_scheduler_impl_t *this) {
      this->state = STATE_STOPPED;
 }
 
+static void event_callback(yacad_event_t *event, yacad_task_t *task, yacad_scheduler_impl_t *this) {
+     this->tasklist->add(this->tasklist, task);
+}
+
 static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
      // runs in the event queue thread
      switch(this->state) {
      case STATE_RUNNING:
-          return yacad_event_new_conf(this->conf);
+          return yacad_event_new_conf(this->conf, (yacad_event_callback)event_callback, this);
      case STATE_STOPPING:
           return yacad_event_new_action((yacad_event_action)do_stop, 0, this);
      default:

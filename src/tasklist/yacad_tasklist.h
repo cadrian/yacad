@@ -17,6 +17,7 @@
 #ifndef __YACAD_TASKLIST_H__
 #define __YACAD_TASKLIST_H__
 
+#include "yacad.h"
 #include "yacad_task.h"
 
 typedef struct yacad_tasklist_s yacad_tasklist_t;

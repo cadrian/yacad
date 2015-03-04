@@ -21,10 +21,15 @@
 typedef struct yacad_conf_impl_s {
      yacad_conf_t fn;
      const char *database_name;
+     const char *action_script;
 } yacad_conf_impl_t;
 
 static const char *get_database_name(yacad_conf_impl_t *this) {
      return this->database_name;
+}
+
+static const char *get_action_script(yacad_conf_impl_t *this) {
+     return this->action_script;
 }
 
 static void free_(yacad_conf_impl_t *this) {
@@ -33,6 +38,7 @@ static void free_(yacad_conf_impl_t *this) {
 
 static yacad_conf_t impl_fn =  {
      .get_database_name = (yacad_conf_get_database_name_fn)get_database_name,
+     .get_action_script = (yacad_conf_get_action_script_fn)get_action_script,
      .free = (yacad_conf_free_fn)free_,
 };
 
@@ -40,5 +46,6 @@ yacad_conf_t *yacad_conf_new(void) {
      yacad_conf_impl_t *result = malloc(sizeof(yacad_conf_impl_t));
      result->fn = impl_fn;
      result->database_name = "yacad.db";
+     result->action_script = "yacad_scheduler.sh";
      return &(result->fn);
 }

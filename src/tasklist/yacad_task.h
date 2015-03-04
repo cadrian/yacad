@@ -17,6 +17,8 @@
 #ifndef __YACAD_TASK_H__
 #define __YACAD_TASK_H__
 
+#include "yacad.h"
+
 typedef struct yacad_task_s yacad_task_t;
 
 typedef int (*yacad_task_get_id_fn)(yacad_task_t *this);
