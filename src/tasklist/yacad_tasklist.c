@@ -46,18 +46,18 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
      int i, n;
      bool_t found = false;
      if (tasklist == NULL) {
-          tasklist = cad_new_array(stdlib_memory);
+          tasklist = cad_new_array(stdlib_memory, sizeof(yacad_task_t*));
           this->tasklist_per_runner->set(this->tasklist_per_runner, runner_name, tasklist);
      }
      n = tasklist->count(tasklist);
      for (i = 0; !found && i < n; i++) {
-          found = same_task(task, tasklist->get(tasklist, i));
+          found = same_task(task, *(yacad_task_t**)tasklist->get(tasklist, i));
      }
      if (found) {
           printf("task not added: %s\n", task->serialize(task));
           task->free(task);
      } else {
-          tasklist->insert(tasklist, n, task);
+          tasklist->insert(tasklist, n, &task);
           printf("added task: %s\n", task->serialize(task));
           // TODO if task.id == 0??
           // TODO save to database
@@ -68,7 +68,8 @@ static yacad_task_t *get(yacad_tasklist_impl_t *this, const char *runner_name) {
      yacad_task_t *result = NULL;
      cad_array_t *tasklist = this->tasklist_per_runner->get(this->tasklist_per_runner, runner_name);
      if (tasklist != NULL) {
-          result = tasklist->del(tasklist, 0);
+          result = *(yacad_task_t **)tasklist->get(tasklist, 0);
+          tasklist->del(tasklist, 0);
      }
      // TODO save to database // NO!! do that only when the task is successfully performed (we need an extra method here)
      return result;
@@ -79,7 +80,7 @@ static void free_tasklist(cad_hash_t *dict, int index, const char *runner_name, 
      int i, n = tasklist->count(tasklist);
      yacad_task_t *task;
      for (i = 0; i < n; i++) {
-          task = tasklist->get(tasklist, i);
+          task = *(yacad_task_t **)tasklist->get(tasklist, i);
           task->free(task);
      }
      tasklist->free(tasklist);

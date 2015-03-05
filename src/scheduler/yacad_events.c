@@ -66,11 +66,11 @@ cad_hash_keys_t keys = {
 };
 
 static void on_timeout(yacad_events_impl_t *this, on_timeout_action action, void *data) {
-     event_t *event = malloc(sizeof(event_t));
+     event_t event;
      int n = this->on_timeout->count(this->on_timeout);
-     event->action.timeout = action;
-     event->data = data;
-     this->on_timeout->insert(this->on_timeout, n, event);
+     event.action.timeout = action;
+     event.data = data;
+     this->on_timeout->insert(this->on_timeout, n, &event);
      this->count++;
 }
 
@@ -106,12 +106,7 @@ static void clean_iterator(cad_hash_t *hash, int index, const void *key, event_t
 }
 
 static void cleanup(yacad_events_impl_t *this) {
-     event_t *event;
-     int i, n = this->on_timeout->count(this->on_timeout);
-     for (i = 0; i < n; i++) {
-          event = this->on_timeout->get(this->on_timeout, i);
-          free(event);
-     }
+     this->on_timeout->clear(this->on_timeout);
      this->on_read->clean(this->on_read, (cad_hash_iterator_fn)clean_iterator, this);
      this->on_write->clean(this->on_write, (cad_hash_iterator_fn)clean_iterator, this);
      this->on_exception->clean(this->on_exception, (cad_hash_iterator_fn)clean_iterator, this);
@@ -183,7 +178,7 @@ yacad_events_t *yacad_events_new(void) {
      yacad_events_impl_t *result = malloc(sizeof(yacad_events_impl_t));
      result->fn = impl_fn;
      result->events = cad_new_events_poller(stdlib_memory);
-     result->on_timeout = cad_new_array(stdlib_memory);
+     result->on_timeout = cad_new_array(stdlib_memory, sizeof(event_t));
      result->on_read = cad_new_hash(stdlib_memory, keys);
      result->on_write = cad_new_hash(stdlib_memory, keys);
      result->on_exception = cad_new_hash(stdlib_memory, keys);
