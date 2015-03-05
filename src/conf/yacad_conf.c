@@ -23,15 +23,17 @@
 #include <sys/wait.h>
 
 #include <cad_hash.h>
+#include <json.h>
 
 #include "yacad_conf.h"
 
-//static const char *dirs[] = {
-//     "/etc/xdg/yacad",
-//     "/etc/yacad",
-//     "/usr/local/etc/yacad",
-//     NULL
-//};
+static const char *dirs[] = {
+     "/etc/xdg/yacad",
+     "/etc/yacad",
+     "/usr/local/etc/yacad",
+     ".",
+     NULL
+};
 
 typedef struct yacad_conf_impl_s {
      yacad_conf_t fn;
@@ -39,6 +41,7 @@ typedef struct yacad_conf_impl_s {
      const char *action_script;
      cad_hash_t *projects;
      cad_hash_t *runners;
+     json_value_t *value;
 } yacad_conf_impl_t;
 
 static const char *get_database_name(yacad_conf_impl_t *this) {
@@ -174,13 +177,48 @@ static yacad_conf_t impl_fn =  {
      .free = (yacad_conf_free_fn)free_,
 };
 
+static void on_error(json_input_stream_t *stream, int line, int column, const char *format, ...) {
+     va_list args;
+     va_start(args, format);
+     fprintf(stderr, "**** Syntax error line %d, column %d: ", line, column);
+     vfprintf(stderr, format, args);
+     fprintf(stderr, "\n");
+     va_end(args);
+     exit(1);
+}
+
+static void read_conf(yacad_conf_impl_t *this, const char *dir) {
+     static char filename[4096];
+     FILE *file;
+     json_input_stream_t *stream;
+     snprintf(filename, 4096, "%s/core.conf", dir);
+     file = fopen(filename, "r");
+     if (file != NULL) {
+          stream = new_json_input_stream_from_file(file, stdlib_memory);
+          this->value = json_parse(stream, on_error, stdlib_memory);
+          fclose(file);
+          stream->free(stream);
+          if (this->value != NULL) {
+               printf("Successfully read configuration file %s\n", filename);
+          } else {
+               fprintf(stderr, "**** Invalid JSON: %s\n", filename);
+          }
+     } else {
+          fprintf(stderr, "**** File not found: %s\n", filename);
+     }
+}
+
 yacad_conf_t *yacad_conf_new(void) {
      yacad_conf_impl_t *result = malloc(sizeof(yacad_conf_impl_t));
+     int i;
      result->fn = impl_fn;
      result->database_name = "yacad.db";
      result->action_script = "yacad_scheduler.sh";
      result->projects = cad_new_hash(stdlib_memory, cad_hash_strings);
      result->runners = cad_new_hash(stdlib_memory, cad_hash_strings);
-     // TODO read conf
+     result->value = NULL;
+     for (i = 0; dirs[i] != NULL && result->value == NULL; i++) {
+          read_conf(result, dirs[i]);
+     }
      return &(result->fn);
 }

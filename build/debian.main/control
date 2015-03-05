@@ -1,25 +1,36 @@
-Source: exp
+Source: yacad
 Section: admin
 Priority: optional
 Maintainer: Cyril Adrian <cyril.adrian@gmail.com>
-Build-Depends: debhelper (>= 9), libcad-dev, libpcre3-dev, doxygen, texlive-fonts-extra
+Build-Depends: debhelper (>= 9), libcad-dev, libyacjp-dev
+Build-Depends-Indep: doxygen, texlive-fonts-extra
 Standards-Version: 3.9.5
-Homepage: https://github.com/cadrian/exp
-Vcs-Git: https://github.com/cadrian/exp.git
-Vcs-Browser: https://github.com/cadrian/exp
+Homepage: https://github.com/cadrian/yacad
+Vcs-Git: https://github.com/cadrian/yacad.git
+Vcs-Browser: https://github.com/cadrian/yacad
 
-Package: exp
+Package: yacad-core
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libcad0, libpcre3
-Description: A log analyzer
- A tool that helps analyze logs.
+Depends: ${shlibs:Depends}, ${misc:Depends}, libcad0, libyacjp0
+Description: yet another Continuous Automation Design
+ A light-weight continuous integration system.
+ .
+ The "Core" server.
 
-Package: exp-doc
+Package: yacad-runner
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libcad0, libyacjp0
+Description: yet another Continuous Automation Design
+ A light-weight continuous integration system.
+ .
+ The "Runner" slave.
+
+Package: yacad-doc
 Section: doc
 Architecture: all
 Depends: ${misc:Depends}
-Recommends: exp (= ${binary:Version})
-Description:  A log analyzer
- A tool that helps analyze logs.
+Recommends: yacad (= ${binary:Version})
+Description: yet another Continuous Automation Design
+ A light-weight continuous integration system.
  .
  The documentation.

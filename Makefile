@@ -33,11 +33,11 @@ clean: $(LIBCADCLEAN)
 	rm -rf target debian
 	rm -f src/_exp_entry_registry.c
 
-exe: target/$(PROJECT)
+exe: target/$(PROJECT)_core
 
-target/$(PROJECT): $(OBJ) $(LIBCAD)
+target/$(PROJECT)_core: $(OBJ) $(LIBCAD)
 	@echo "Compiling executable: $@"
-	$(CC) $(CFLAGS) -o $@ $(OBJ) -Wall -Werror -L target -lpcre -lcad -lm
+	$(CC) $(CFLAGS) -o $@ $(OBJ) -Wall -Werror -L target -lcad -lyacjp -lm
 
 target/out/%.o: src/%.c src/*.h Makefile
 	mkdir -p $(shell dirname $@)
@@ -71,7 +71,7 @@ install: exe doc target/version
 	mkdir -p debian/tmp/usr/bin
 	mkdir -p debian/tmp/usr/share/$(PROJECT)
 	mkdir -p debian/tmp/usr/share/doc/$(PROJECT)-doc
-	-cp target/$(PROJECT) debian/tmp/usr/bin/
+	-cp target/$(PROJECT)_core debian/tmp/usr/bin/
 	-cp -a target/*.pdf target/doc/html debian/tmp/usr/share/doc/$(PROJECT)-doc/
 
 release.main: target/dpkg/release.main release.doc
