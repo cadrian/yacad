@@ -182,7 +182,7 @@ static void do_exception(int fd, yacad_events_impl_t*this) {
 yacad_events_t *yacad_events_new(void) {
      yacad_events_impl_t *result = malloc(sizeof(yacad_events_impl_t));
      result->fn = impl_fn;
-     result->events = cad_new_events_selector(stdlib_memory);
+     result->events = cad_new_events_poller(stdlib_memory);
      result->on_timeout = cad_new_array(stdlib_memory);
      result->on_read = cad_new_hash(stdlib_memory, keys);
      result->on_write = cad_new_hash(stdlib_memory, keys);
