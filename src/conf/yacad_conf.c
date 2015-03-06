@@ -194,17 +194,14 @@ static void read_conf(yacad_conf_impl_t *this, const char *dir) {
      snprintf(filename, 4096, "%s/core.conf", dir);
      file = fopen(filename, "r");
      if (file != NULL) {
+          printf("Reading configuration file %s\n", filename);
           stream = new_json_input_stream_from_file(file, stdlib_memory);
           this->value = json_parse(stream, on_error, stdlib_memory);
           fclose(file);
           stream->free(stream);
-          if (this->value != NULL) {
-               printf("Successfully read configuration file %s\n", filename);
-          } else {
+          if (this->value == NULL) {
                fprintf(stderr, "**** Invalid JSON: %s\n", filename);
           }
-     } else {
-          fprintf(stderr, "**** File not found: %s\n", filename);
      }
 }
 

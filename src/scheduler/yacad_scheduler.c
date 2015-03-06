@@ -15,6 +15,7 @@
 */
 
 #include <stdio.h>
+#include <unistd.h>
 
 #include <cad_event_queue.h>
 
@@ -83,10 +84,15 @@ static void event_callback(yacad_event_t *event, yacad_task_t *task, yacad_sched
 }
 
 static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
-     // runs in the event queue thread
+     // runs in the event queue thread, that's why I don't want to use this->conf - not sure if the conf will be stateless
+     static yacad_conf_t *conf = NULL;
+     if (conf == NULL) {
+          conf = yacad_conf_new();
+     }
+     sleep(1); // 1 event per second
      switch(this->state) {
      case STATE_RUNNING:
-          return yacad_event_new_conf(this->conf, (yacad_event_callback)event_callback, this);
+          return yacad_event_new_conf(conf, (yacad_event_callback)event_callback, this);
      case STATE_STOPPING:
           return yacad_event_new_action((yacad_event_action)do_stop, 0, this);
      default:

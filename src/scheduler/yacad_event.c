@@ -15,7 +15,6 @@
 */
 
 #include <stdlib.h>
-#include <unistd.h>
 
 #include "yacad_event.h"
 
@@ -42,7 +41,8 @@ static yacad_event_t impl_fn = {
 };
 
 static void script_action(yacad_event_impl_t *this, yacad_event_callback callback, yacad_conf_t *conf) {
-     yacad_task_t *task = conf->next_task(conf);
+     yacad_task_t *task;
+     task = conf->next_task(conf);
      if (task != NULL) {
           callback(&(this->fn), task, this->callback_data);
      }
@@ -59,8 +59,6 @@ yacad_event_t *yacad_event_new_action(yacad_event_action action, yacad_event_cal
 
 yacad_event_t *yacad_event_new_conf(yacad_conf_t *conf, yacad_event_callback callback, void *data) {
      yacad_event_impl_t *result = malloc(sizeof(yacad_event_impl_t));
-
-     sleep(1);
 
      result->fn = impl_fn;
      result->action = (yacad_event_action)script_action;
