@@ -24,7 +24,7 @@
 
 typedef struct yacad_tasklist_impl_s {
      yacad_tasklist_t fn;
-     const char *database_name;
+     yacad_conf_t *conf;
      cad_hash_t *tasklist_per_runner;
 } yacad_tasklist_impl_t;
 
@@ -54,11 +54,11 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
           found = same_task(task, *(yacad_task_t**)tasklist->get(tasklist, i));
      }
      if (found) {
-          printf("task not added: %s\n", task->serialize(task));
+          this->conf->log(debug, "task not added: %s\n", task->serialize(task));
           task->free(task);
      } else {
           tasklist->insert(tasklist, n, &task);
-          printf("added task: %s\n", task->serialize(task));
+          this->conf->log(debug, "added task: %s\n", task->serialize(task));
           // TODO if task.id == 0??
           // TODO save to database
      }
@@ -98,10 +98,10 @@ static yacad_tasklist_t impl_fn = {
      .free = (yacad_tasklist_free_fn)free_,
 };
 
-yacad_tasklist_t *yacad_tasklist_new(const char *database_name) {
+yacad_tasklist_t *yacad_tasklist_new(yacad_conf_t *conf) {
      yacad_tasklist_impl_t *result = malloc(sizeof(yacad_tasklist_impl_t));
      result->fn = impl_fn;
-     result->database_name = database_name;
+     result->conf = conf;
      result->tasklist_per_runner = cad_new_hash(stdlib_memory, cad_hash_strings);
      // TODO read from database
      return &(result->fn);

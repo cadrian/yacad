@@ -112,7 +112,7 @@ yacad_scheduler_t *yacad_scheduler_new(yacad_conf_t *conf) {
      result->fn = impl_fn;
      result->conf = conf;
      result->state = STATE_INIT;
-     result->tasklist = yacad_tasklist_new(result->conf->get_database_name(conf));
+     result->tasklist = yacad_tasklist_new(conf);
      result->event_queue = cad_new_event_queue_pthread(stdlib_memory, (provide_data_fn)event_provider, 16);
      result->event_queue->start(result->event_queue, result);
      result->state = STATE_RUNNING;

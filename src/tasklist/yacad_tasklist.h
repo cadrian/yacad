@@ -19,6 +19,7 @@
 
 #include "yacad.h"
 #include "yacad_task.h"
+#include "conf/yacad_conf.h"
 
 typedef struct yacad_tasklist_s yacad_tasklist_t;
 
@@ -32,6 +33,6 @@ struct yacad_tasklist_s {
      yacad_tasklist_free_fn free;
 };
 
-yacad_tasklist_t *yacad_tasklist_new(const char *database_name);
+yacad_tasklist_t *yacad_tasklist_new(yacad_conf_t *conf);
 
 #endif /* __YACAD_TASKLIST_H__ */

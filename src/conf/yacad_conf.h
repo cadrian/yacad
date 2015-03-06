@@ -17,10 +17,41 @@
 #ifndef __YACAD_CONF_H__
 #define __YACAD_CONF_H__
 
+#include <cad_shared.h>
+
 #include "yacad.h"
 #include "tasklist/yacad_task.h"
 #include "yacad_project.h"
 #include "yacad_runner.h"
+
+/**
+ * The log levels
+ */
+typedef enum {
+     /**
+      * Warnings (default level)
+      */
+     warn=0,
+     /**
+      * Informations on how ExP runs
+      */
+     info,
+     /**
+      * Developer details, usually not useful
+      */
+     debug,
+} level_t;
+
+/**
+ * A logger is a `printf`-like function to call
+ *
+ * @param[in] level the logging level
+ * @param[in] format the message format
+ * @param[in] ... the message arguments
+ *
+ * @return the length of the message after expansion; 0 if the log is not emitted because of the level
+ */
+typedef int (*logger_t) (level_t level, char *format, ...) __PRINTF__;
 
 typedef struct yacad_conf_s yacad_conf_t;
 
@@ -31,6 +62,7 @@ typedef yacad_runner_t *(*yacad_conf_get_runner_fn)(yacad_conf_t *this, const ch
 typedef void (*yacad_conf_free_fn)(yacad_conf_t *this);
 
 struct yacad_conf_s {
+     logger_t log;
      yacad_conf_get_database_name_fn get_database_name;
      yacad_conf_next_task_fn next_task;
      yacad_conf_get_project_fn get_project;

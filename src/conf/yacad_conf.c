@@ -41,8 +41,57 @@ typedef struct yacad_conf_impl_s {
      const char *action_script;
      cad_hash_t *projects;
      cad_hash_t *runners;
-     json_value_t *value;
+     json_value_t *json;
 } yacad_conf_impl_t;
+
+static void taglog(level_t level) {
+   struct timeval tm;
+   char buffer[20];
+   static char *tag[] = {
+      "WARN ",
+      "INFO ",
+      "DEBUG"
+   };
+   gettimeofday(&tm, NULL);
+   strftime(buffer, 20, "%Y/%m/%d %H:%M:%S", localtime(&tm.tv_sec));
+   fprintf(stderr, "%s.%06ld [%s] ", buffer, tm.tv_usec, tag[level]);
+}
+
+static int warn_logger(level_t level, char *format, ...) {
+   int result = 0;
+   va_list arg;
+   if(level <= warn) {
+      va_start(arg, format);
+      taglog(level);
+      result = vfprintf(stderr, format, arg);
+      va_end(arg);
+   }
+   return result;
+}
+
+static int info_logger(level_t level, char *format, ...) {
+   int result = 0;
+   va_list arg;
+   if(level <= info) {
+      va_start(arg, format);
+      taglog(level);
+      result = vfprintf(stderr, format, arg);
+      va_end(arg);
+   }
+   return result;
+}
+
+static int debug_logger(level_t level, char *format, ...) {
+   int result = 0;
+   va_list arg;
+   if(level <= debug) {
+      va_start(arg, format);
+      taglog(level);
+      result = vfprintf(stderr, format, arg);
+      va_end(arg);
+   }
+   return result;
+}
 
 static const char *get_database_name(yacad_conf_impl_t *this) {
      return this->database_name;
@@ -57,6 +106,9 @@ static yacad_runner_t *get_runner(yacad_conf_impl_t *this, const char *runner_na
 }
 
 static void free_(yacad_conf_impl_t *this) {
+     if (this->json != NULL) {
+          this->json->accept(this->json, json_kill());
+     }
      free(this);
 }
 
@@ -170,6 +222,7 @@ static yacad_task_t *next_task(yacad_conf_impl_t *this) {
 }
 
 static yacad_conf_t impl_fn =  {
+     .log = debug_logger,
      .get_database_name = (yacad_conf_get_database_name_fn)get_database_name,
      .next_task = (yacad_conf_next_task_fn)next_task,
      .get_project = (yacad_conf_get_project_fn)get_project,
@@ -196,26 +249,121 @@ static void read_conf(yacad_conf_impl_t *this, const char *dir) {
      if (file != NULL) {
           printf("Reading configuration file %s\n", filename);
           stream = new_json_input_stream_from_file(file, stdlib_memory);
-          this->value = json_parse(stream, on_error, stdlib_memory);
+          this->json = json_parse(stream, on_error, stdlib_memory);
           fclose(file);
           stream->free(stream);
-          if (this->value == NULL) {
+          if (this->json == NULL) {
                fprintf(stderr, "**** Invalid JSON: %s\n", filename);
           }
      }
 }
 
+typedef struct {
+     json_visitor_t v;
+     yacad_conf_impl_t *conf;
+     const char *path;
+} conf_visitor_t;
+
+static void free_visitor(conf_visitor_t *this) {
+     free(this);
+}
+
+static void invalid_object(conf_visitor_t *this, json_object_t *visited) {
+     fprintf(stderr, "**** Unexpected object: %s\n", this->path);
+}
+
+static void invalid_array(conf_visitor_t *this, json_array_t *visited) {
+     fprintf(stderr, "**** Unexpected array: %s\n", this->path);
+}
+
+static void invalid_string(conf_visitor_t *this, json_array_t *visited) {
+     fprintf(stderr, "**** Unexpected string: %s\n", this->path);
+}
+
+static void invalid_number(conf_visitor_t *this, json_number_t *visited) {
+     fprintf(stderr, "**** Unexpected number: %s\n", this->path);
+}
+
+static void invalid_const(conf_visitor_t *this, json_const_t *visited) {
+     fprintf(stderr, "**** Unexpected const: %s\n", this->path);
+}
+
+static conf_visitor_t *conf_visitor(yacad_conf_impl_t *conf, const char *path) {
+     static struct json_visitor visitor = {
+          .free = (json_visit_free_fn)free_visitor,
+          .visit_object = (json_visit_object_fn)invalid_object,
+          .visit_array = (json_visit_array_fn)invalid_array,
+          .visit_string = (json_visit_string_fn)invalid_string,
+          .visit_number = (json_visit_number_fn)invalid_number,
+          .visit_const = (json_visit_const_fn)invalid_const,
+     };
+     conf_visitor_t *result = malloc(sizeof(conf_visitor_t));
+     result->v = visitor;
+     result->conf = conf;
+     result->path = path;
+     return result;
+}
+
+static void set_json_logger(conf_visitor_t *this, json_string_t *jlevel) {
+     size_t i, n;
+     char *level;
+
+     n = jlevel->count(jlevel);
+     level = malloc(n+1);
+     i = jlevel->utf8(jlevel, level, n+1);
+     if (!strncmp("debug", level, i)) {
+          this->conf->fn.log = debug_logger;
+     } else if (!strncmp("info", level, i)) {
+          this->conf->fn.log = info_logger;
+     } else if (!strncmp("warn", level, i)) {
+          this->conf->fn.log = warn_logger;
+     } else {
+          fprintf(stderr, "**** Unknown level: '%s' (ignored)\n", level);
+     }
+     free(level);
+}
+
+static void set_logger(yacad_conf_impl_t *this) {
+     conf_visitor_t *v;
+     json_value_t *jlevel;
+
+     jlevel = json_lookup(this->json, "debug", "level", JSON_STOP);
+     if (jlevel != NULL) {
+          v = conf_visitor(this, "debug/level");
+          v->v.visit_string = (json_visit_string_fn)set_json_logger;
+          jlevel->accept(jlevel, &(v->v));
+          v->v.free(&(v->v));
+     }
+}
+
 yacad_conf_t *yacad_conf_new(void) {
+     // The actual conf is read only once; after, the JSON object is cloned.
+     static yacad_conf_impl_t *ref = NULL;
+
      yacad_conf_impl_t *result = malloc(sizeof(yacad_conf_impl_t));
+     json_visitor_t *cloner;
      int i;
+
      result->fn = impl_fn;
      result->database_name = "yacad.db";
      result->action_script = "yacad_scheduler.sh";
      result->projects = cad_new_hash(stdlib_memory, cad_hash_strings);
      result->runners = cad_new_hash(stdlib_memory, cad_hash_strings);
-     result->value = NULL;
-     for (i = 0; dirs[i] != NULL && result->value == NULL; i++) {
-          read_conf(result, dirs[i]);
+     result->json = NULL;
+
+     if (ref == NULL) {
+          for (i = 0; dirs[i] != NULL && result->json == NULL; i++) {
+               read_conf(result, dirs[i]);
+          }
+          if (result->json != NULL) {
+               set_logger(result);
+          }
+          ref = result;
+     } else {
+          cloner = json_clone(&result->json, stdlib_memory);
+          ref->json->accept(ref->json, cloner);
+          cloner->free(cloner);
      }
+
      return &(result->fn);
 }
