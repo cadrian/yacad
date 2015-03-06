@@ -19,6 +19,20 @@ LIBCADCLEAN=libcadclean
 GENDOC=$(shell cd ../libcad; echo $$(pwd)/gendoc.sh)
 endif
 
+ifeq "$(wildcard ../yacjp)" ""
+LIBYACJP=
+LIBYACJPINCLUDE=
+LIBYACJPCLEAN=
+else
+ifeq "$(wildcard /etc/setup/setup.rc)" ""
+LIBYACJP=target/libyacjp.so
+else
+LIBYACJP=target/cygyacjp.dll
+endif
+LIBYACJPINCLUDE=-I ../yacjp/include
+LIBYACJPCLEAN=libyacjpclean
+endif
+
 CFLAGS ?= -g
 LDFLAGS ?=
 
@@ -29,20 +43,20 @@ all: exe doc
 endif
 	@echo
 
-clean: $(LIBCADCLEAN)
+clean: $(LIBCADCLEAN) $(LIBYACJPCLEAN)
 	rm -rf target debian
 	rm -f src/_exp_entry_registry.c
 
 exe: target/$(PROJECT)_core
 
-target/$(PROJECT)_core: $(OBJ) $(LIBCAD)
+target/$(PROJECT)_core: $(OBJ) $(LIBCAD) $(LIBYACJP)
 	@echo "Compiling executable: $@"
 	$(CC) $(CFLAGS) -o $@ $(OBJ) -Wall -Werror -L target -lcad -lyacjp -lm
 
 target/out/%.o: src/%.c src/*.h Makefile
 	mkdir -p $(shell dirname $@)
 	@echo "Compiling object: $<"
-	$(CC) $(CFLAGS) -I src $(LIBCADINCLUDE) -Wall -Werror -c $< -o $@
+	$(CC) $(CFLAGS) -I src $(LIBCADINCLUDE) $(LIBYACJPINCLUDE) -Wall -Werror -c $< -o $@
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # libcad
@@ -63,6 +77,26 @@ target/libcad.dll.a:
 	mkdir -p target
 	cd ../libcad && make lib
 	cp ../libcad/target/libcad.dll.a target/
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# libyacjp
+
+libyacjpclean:
+	cd ../yacjp && make clean
+
+target/libyacjp.so:
+	mkdir -p target
+	cd ../yacjp && make lib
+	cp ../yacjp/target/libyacjp.so* target/
+
+target/cygyacjp.dll: target/libyacjp.dll.a
+	mkdir -p target
+	cp ../yacjp/target/cygyacjp.dll target/
+
+target/libyacjp.dll.a:
+	mkdir -p target
+	cd ../yacjp && make lib
+	cp ../yacjp/target/libyacjp.dll.a target/
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # release
