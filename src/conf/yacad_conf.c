@@ -39,6 +39,14 @@ static const char *dirs[] = {
      NULL
 };
 
+typedef enum {
+     json_type_object,
+     json_type_array,
+     json_type_string,
+     json_type_number,
+     json_type_const,
+} json_type_t;
+
 typedef struct yacad_conf_impl_s {
      yacad_conf_t fn;
      const char *database_name;
@@ -266,6 +274,7 @@ typedef struct {
      json_visitor_t fn;
      yacad_conf_impl_t *conf;
      char *current_path;
+     json_type_t expected_type;
      bool_t found;
      union {
           json_object_t *object;
@@ -287,7 +296,7 @@ static void visit_object(conf_visitor_t *this, json_object_t *visited) {
      json_value_t *value;
      this->value.object = visited;
      if (this->current_path[0] == '\0') {
-          this->found = true;
+          this->found = (this->expected_type == json_type_object);
      } else {
           next_path = strchrnul(key, '/');
           this->current_path = next_path + (*next_path ? 1 : 0);
@@ -306,7 +315,7 @@ static void visit_array(conf_visitor_t *this, json_array_t *visited) {
      int index;
      this->value.array = visited;
      if (this->current_path[0] == '\0') {
-          this->found = true;
+          this->found = (this->expected_type == json_type_array);
      } else {
           next_path = strchrnul(key, '/');
           this->current_path = next_path + (*next_path ? 1 : 0);
@@ -322,25 +331,25 @@ static void visit_array(conf_visitor_t *this, json_array_t *visited) {
 static void visit_string(conf_visitor_t *this, json_string_t *visited) {
      this->value.string = visited;
      if (this->current_path[0] == '\0') {
-          this->found = true;
+          this->found = (this->expected_type == json_type_string);
      }
 }
 
 static void visit_number(conf_visitor_t *this, json_number_t *visited) {
      this->value.number = visited;
      if (this->current_path[0] == '\0') {
-          this->found = true;
+          this->found = (this->expected_type == json_type_number);
      }
 }
 
 static void visit_const(conf_visitor_t *this, json_const_t *visited) {
      this->value.constant = visited;
      if (this->current_path[0] == '\0') {
-          this->found = true;
+          this->found = (this->expected_type == json_type_const);
      }
 }
 
-static conf_visitor_t *conf_visitor(yacad_conf_impl_t *conf, const char *path) {
+static __attribute__((format(printf, 3, 4))) conf_visitor_t *conf_visitor(yacad_conf_impl_t *conf, json_type_t expected_type, const char *pathformat, ...) {
      static struct json_visitor visitor = {
           .free = (json_visit_free_fn)free_visitor,
           .visit_object = (json_visit_object_fn)visit_object,
@@ -349,17 +358,29 @@ static conf_visitor_t *conf_visitor(yacad_conf_impl_t *conf, const char *path) {
           .visit_number = (json_visit_number_fn)visit_number,
           .visit_const = (json_visit_const_fn)visit_const,
      };
-     conf_visitor_t *result = malloc(sizeof(conf_visitor_t) + strlen(path) + 1);
-     strcpy(result->path, path);
+     conf_visitor_t *result;
+     va_list args;
+     int n;
+
+     va_start(args, pathformat);
+     n = vsnprintf("", 0, pathformat, args) + 1;
+     va_end(args);
+
+     result = malloc(sizeof(conf_visitor_t) + n);
+     va_start(args, pathformat);
+     vsnprintf(result->path, n, pathformat, args);
+     va_end(args);
+
      result->fn = visitor;
      result->conf = conf;
      result->found = false;
+     result->expected_type = expected_type;
      result->current_path = result->path;
      return result;
 }
 
 static void set_logger(yacad_conf_impl_t *this) {
-     conf_visitor_t *v = conf_visitor(this, "debug/level");
+     conf_visitor_t *v = conf_visitor(this, json_type_string, "debug/level");
      size_t i, n;
      char *level;
      json_string_t *jlevel;
