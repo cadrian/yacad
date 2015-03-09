@@ -25,6 +25,7 @@
 #include <sys/wait.h>
 #include <stdarg.h>
 #include <alloca.h>
+#include <time.h>
 
 #include <cad_hash.h>
 #include <json.h>
