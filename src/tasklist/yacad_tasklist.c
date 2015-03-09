@@ -58,7 +58,7 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
           task->free(task);
      } else {
           tasklist->insert(tasklist, n, &task);
-          this->conf->log(debug, "added task: %s\n", task->serialize(task));
+          this->conf->log(info, "added task: %s\n", task->serialize(task));
           // TODO if task.id == 0??
           // TODO save to database
      }

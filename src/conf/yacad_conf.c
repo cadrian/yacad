@@ -14,6 +14,8 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#define _GNU_SOURCE
+
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -21,6 +23,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <stdarg.h>
+#include <alloca.h>
 
 #include <cad_hash.h>
 #include <json.h>
@@ -259,81 +263,123 @@ static void read_conf(yacad_conf_impl_t *this, const char *dir) {
 }
 
 typedef struct {
-     json_visitor_t v;
+     json_visitor_t fn;
      yacad_conf_impl_t *conf;
-     const char *path;
+     char *current_path;
+     bool_t found;
+     union {
+          json_object_t *object;
+          json_array_t *array;
+          json_string_t *string;
+          json_number_t *number;
+          json_const_t *constant;
+     } value;
+     char path[0];
 } conf_visitor_t;
 
 static void free_visitor(conf_visitor_t *this) {
      free(this);
 }
 
-static void invalid_object(conf_visitor_t *this, json_object_t *visited) {
-     fprintf(stderr, "**** Unexpected object: %s\n", this->path);
+static void visit_object(conf_visitor_t *this, json_object_t *visited) {
+     char *key = this->current_path;
+     char *next_path;
+     json_value_t *value;
+     this->value.object = visited;
+     if (this->current_path[0] == '\0') {
+          this->found = true;
+     } else {
+          next_path = strchrnul(key, '/');
+          this->current_path = next_path + (*next_path ? 1 : 0);
+          *next_path = '\0';
+          value = visited->get(visited, key);
+          if (value != NULL) {
+               value->accept(value, &(this->fn));
+          }
+     }
 }
 
-static void invalid_array(conf_visitor_t *this, json_array_t *visited) {
-     fprintf(stderr, "**** Unexpected array: %s\n", this->path);
+static void visit_array(conf_visitor_t *this, json_array_t *visited) {
+     char *key = this->current_path;
+     char *next_path;
+     json_value_t *value;
+     int index;
+     this->value.array = visited;
+     if (this->current_path[0] == '\0') {
+          this->found = true;
+     } else {
+          next_path = strchrnul(key, '/');
+          this->current_path = next_path + (*next_path ? 1 : 0);
+          *next_path = '\0';
+          index = atoi(key);
+          value = visited->get(visited, index);
+          if (value != NULL) {
+               value->accept(value, &(this->fn));
+          }
+     }
 }
 
-static void invalid_string(conf_visitor_t *this, json_array_t *visited) {
-     fprintf(stderr, "**** Unexpected string: %s\n", this->path);
+static void visit_string(conf_visitor_t *this, json_string_t *visited) {
+     this->value.string = visited;
+     if (this->current_path[0] == '\0') {
+          this->found = true;
+     }
 }
 
-static void invalid_number(conf_visitor_t *this, json_number_t *visited) {
-     fprintf(stderr, "**** Unexpected number: %s\n", this->path);
+static void visit_number(conf_visitor_t *this, json_number_t *visited) {
+     this->value.number = visited;
+     if (this->current_path[0] == '\0') {
+          this->found = true;
+     }
 }
 
-static void invalid_const(conf_visitor_t *this, json_const_t *visited) {
-     fprintf(stderr, "**** Unexpected const: %s\n", this->path);
+static void visit_const(conf_visitor_t *this, json_const_t *visited) {
+     this->value.constant = visited;
+     if (this->current_path[0] == '\0') {
+          this->found = true;
+     }
 }
 
 static conf_visitor_t *conf_visitor(yacad_conf_impl_t *conf, const char *path) {
      static struct json_visitor visitor = {
           .free = (json_visit_free_fn)free_visitor,
-          .visit_object = (json_visit_object_fn)invalid_object,
-          .visit_array = (json_visit_array_fn)invalid_array,
-          .visit_string = (json_visit_string_fn)invalid_string,
-          .visit_number = (json_visit_number_fn)invalid_number,
-          .visit_const = (json_visit_const_fn)invalid_const,
+          .visit_object = (json_visit_object_fn)visit_object,
+          .visit_array = (json_visit_array_fn)visit_array,
+          .visit_string = (json_visit_string_fn)visit_string,
+          .visit_number = (json_visit_number_fn)visit_number,
+          .visit_const = (json_visit_const_fn)visit_const,
      };
-     conf_visitor_t *result = malloc(sizeof(conf_visitor_t));
-     result->v = visitor;
+     conf_visitor_t *result = malloc(sizeof(conf_visitor_t) + strlen(path) + 1);
+     strcpy(result->path, path);
+     result->fn = visitor;
      result->conf = conf;
-     result->path = path;
+     result->found = false;
+     result->current_path = result->path;
      return result;
 }
 
-static void set_json_logger(conf_visitor_t *this, json_string_t *jlevel) {
+static void set_logger(yacad_conf_impl_t *this) {
+     conf_visitor_t *v = conf_visitor(this, "debug/level");
      size_t i, n;
      char *level;
-
-     n = jlevel->count(jlevel);
-     level = malloc(n+1);
-     i = jlevel->utf8(jlevel, level, n+1);
-     if (!strncmp("debug", level, i)) {
-          this->conf->fn.log = debug_logger;
-     } else if (!strncmp("info", level, i)) {
-          this->conf->fn.log = info_logger;
-     } else if (!strncmp("warn", level, i)) {
-          this->conf->fn.log = warn_logger;
-     } else {
-          fprintf(stderr, "**** Unknown level: '%s' (ignored)\n", level);
+     json_string_t *jlevel;
+     this->json->accept(this->json, &(v->fn));
+     if (v->found) {
+          jlevel = v->value.string;
+          n = jlevel->count(jlevel);
+          level = alloca(n+1);
+          i = jlevel->utf8(jlevel, level, n+1);
+          if (!strncmp("debug", level, i)) {
+               this->fn.log = debug_logger;
+          } else if (!strncmp("info", level, i)) {
+               this->fn.log = info_logger;
+          } else if (!strncmp("warn", level, i)) {
+               this->fn.log = warn_logger;
+          } else {
+               fprintf(stderr, "**** Unknown level: '%s' (ignored)\n", level);
+          }
      }
-     free(level);
-}
-
-static void set_logger(yacad_conf_impl_t *this) {
-     conf_visitor_t *v;
-     json_value_t *jlevel;
-
-     jlevel = json_lookup(this->json, "debug", "level", JSON_STOP);
-     if (jlevel != NULL) {
-          v = conf_visitor(this, "debug/level");
-          v->v.visit_string = (json_visit_string_fn)set_json_logger;
-          jlevel->accept(jlevel, &(v->v));
-          v->v.free(&(v->v));
-     }
+     v->fn.free(&(v->fn));
 }
 
 yacad_conf_t *yacad_conf_new(void) {
