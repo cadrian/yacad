@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <time.h>
+#include <pthread.h>
 
 #include <cad_event_queue.h>
 
@@ -32,7 +33,7 @@
 
 typedef struct {
      struct timeval time; // time of the next check
-     bool_t delivered; // true when the event is delivered (to avoid double events)
+     bool_t running; // true when the event is running (to avoid double events)
 } next_check_t;
 
 typedef struct yacad_scheduler_impl_s {
@@ -42,6 +43,7 @@ typedef struct yacad_scheduler_impl_s {
      cad_event_queue_t *event_queue;
      volatile int state;
      volatile next_check_t next_check;
+     pthread_mutex_t lock; /* protects the event provider thread and the volatile variables */
 } yacad_scheduler_impl_t;
 
 static bool_t is_done(yacad_scheduler_impl_t *this) {
@@ -60,17 +62,32 @@ static void run(int fd, yacad_scheduler_impl_t *this) {
 
 static void prepare(yacad_scheduler_impl_t *this, yacad_events_t *events) {
      int fd;
+
+     if (0 != pthread_mutex_lock(&(this->lock))) {
+          this->conf->log(warn, "Fatal error: could not acquire lock\n");
+          exit(1);
+     }
+
      if (this->state < STATE_STOPPED) {
           fd = this->event_queue->get_fd(this->event_queue);
           events->on_read(events, (on_event_action)run, fd, this);
      }
+
+     pthread_mutex_unlock(&(this->lock));
 }
 
 // will stop eventually
 static void stop(yacad_scheduler_impl_t *this) {
+     if (0 != pthread_mutex_lock(&(this->lock))) {
+          this->conf->log(warn, "Fatal error: could not acquire lock\n");
+          exit(1);
+     }
+
      if (this->state < STATE_STOPPING) {
           this->state = STATE_STOPPING;
      }
+
+     pthread_mutex_unlock(&(this->lock));
 }
 
 static void free_(yacad_scheduler_impl_t *this) {
@@ -84,21 +101,28 @@ static void do_stop(yacad_event_t *event, yacad_scheduler_impl_t *this) {
      while (this->event_queue->is_running(this->event_queue)) {
           this->event_queue->stop(this->event_queue);
      }
+
+     if (0 != pthread_mutex_lock(&(this->lock))) {
+          this->conf->log(warn, "Fatal error: could not acquire lock\n");
+          exit(1);
+     }
+
      this->state = STATE_STOPPED;
+
+     pthread_mutex_unlock(&(this->lock));
 }
 
 static void iterate_next_check(cad_hash_t *tasklist_per_runner, int index, const char *key, yacad_project_t *project, yacad_scheduler_impl_t *this) {
      struct timeval tm = project->next_check(project);
      if (timercmp(&tm, &(this->next_check.time), <)) {
           this->next_check.time = tm;
-          this->next_check.delivered = false;
      }
 }
 
 static void next_check(yacad_scheduler_impl_t *this) {
      cad_hash_t *projects = this->conf->get_projects(this->conf);
-     struct timeval tm;
-     struct tm *t;
+     struct timeval tm, save_tm = this->next_check.time;
+     struct tm t;
      char tmbuf[64];
 
      gettimeofday(&tm, NULL);
@@ -107,9 +131,9 @@ static void next_check(yacad_scheduler_impl_t *this) {
      this->next_check.time = tm;
      projects->iterate(projects, (cad_hash_iterator_fn)iterate_next_check, this);
 
-     if (this->conf->log(debug, "Next check time: ") > 0) {
-          t = localtime((time_t*)&(tm.tv_sec));
-          strftime(tmbuf, sizeof(tmbuf), "%Y-%m-%d %H:%M:%S", t);
+     if (timercmp(&save_tm, &(this->next_check.time), !=) && this->conf->log(debug, "Next check time: ") > 0) {
+          localtime_r((time_t*)&(this->next_check.time.tv_sec), &t);
+          strftime(tmbuf, sizeof(tmbuf), "%Y-%m-%d %H:%M:%S", &t);
           this->conf->log(debug, "%s\n", tmbuf);
      }
 }
@@ -126,7 +150,12 @@ static void iterate_check_project(cad_hash_t *tasklist_per_runner, int index, co
 static void do_check(yacad_event_t *event, yacad_event_callback callback, yacad_scheduler_impl_t *this) {
      cad_hash_t *projects = this->conf->get_projects(this->conf);
      projects->iterate(projects, (cad_hash_iterator_fn)iterate_check_project, this);
-     this->next_check.delivered = false;
+     if (0 != pthread_mutex_lock(&(this->lock))) {
+          this->conf->log(warn, "Fatal error: could not acquire lock\n");
+          exit(1);
+     }
+     this->next_check.running = false;
+     pthread_mutex_unlock(&(this->lock));
 }
 
 static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
@@ -136,11 +165,17 @@ static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
 
      static yacad_conf_t *conf = NULL;
      struct timeval now;
+
      if (conf == NULL) {
           conf = yacad_conf_new();
      }
 
-     if (this->next_check.delivered) {
+     if (0 != pthread_mutex_lock(&(this->lock))) {
+          this->conf->log(warn, "Fatal error: could not acquire lock\n");
+          exit(1);
+     }
+
+     if (this->next_check.running) {
           // don't override yet, we wait for the project currently being checked to have finished.
      } else {
           next_check(this);
@@ -150,10 +185,10 @@ static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
 
      switch(this->state) {
      case STATE_RUNNING:
-          if (!this->next_check.delivered) {
-               this->next_check.delivered = true;
+          if (!this->next_check.running) {
                gettimeofday(&now, NULL);
                if (timercmp(&(this->next_check.time), &now, <)) {
+                    this->next_check.running = true;
                     result = yacad_event_new_action((yacad_event_action)do_check, 0, this);
                }
           }
@@ -162,6 +197,7 @@ static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
           result = yacad_event_new_action((yacad_event_action)do_stop, 0, this);
           break;
      }
+     pthread_mutex_unlock(&(this->lock));
 
      return result;
 }
@@ -177,11 +213,12 @@ yacad_scheduler_t *yacad_scheduler_new(yacad_conf_t *conf) {
      yacad_scheduler_impl_t *result = malloc(sizeof(yacad_scheduler_impl_t));
      result->fn = impl_fn;
      result->conf = conf;
-     result->next_check.delivered = false;
+     result->next_check.running = false;
      result->state = STATE_INIT;
      result->tasklist = yacad_tasklist_new(conf);
      result->event_queue = cad_new_event_queue_pthread(stdlib_memory, (provide_data_fn)event_provider, 16);
-     result->event_queue->start(result->event_queue, result);
      result->state = STATE_RUNNING;
+     pthread_mutex_init(&(result->lock), NULL);
+     result->event_queue->start(result->event_queue, result);
      return I(result);
 }

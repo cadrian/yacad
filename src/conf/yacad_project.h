@@ -36,6 +36,7 @@ struct yacad_project_s {
      yacad_project_free_fn free;
 };
 
-yacad_project_t *yacad_project_new(yacad_conf_t *conf, const char *name, const char *scm, const char *root_path, const char *upstream_url, const char *cron);
+yacad_project_t *yacad_project_new(yacad_conf_t *conf, const char *name, const char *scm,
+                                   const char *root_path, const char *upstream_url, const char *cron);
 
 #endif /* __YACAD_PROJECT_H__ */

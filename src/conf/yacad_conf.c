@@ -59,16 +59,18 @@ typedef struct yacad_conf_impl_s {
 } yacad_conf_impl_t;
 
 static void taglog(level_t level) {
-   struct timeval tm;
-   char buffer[20];
-   static char *tag[] = {
-      "WARN ",
-      "INFO ",
-      "DEBUG"
-   };
-   gettimeofday(&tm, NULL);
-   strftime(buffer, 20, "%Y/%m/%d %H:%M:%S", localtime(&tm.tv_sec));
-   fprintf(stderr, "%s.%06ld [%s] ", buffer, tm.tv_usec, tag[level]);
+     struct timeval tm;
+     char buffer[20];
+     static char *tag[] = {
+          "WARN ",
+          "INFO ",
+          "DEBUG"
+     };
+     struct tm t;
+     gettimeofday(&tm, NULL);
+     localtime_r(&tm.tv_sec, &t);
+     strftime(buffer, 20, "%Y/%m/%d %H:%M:%S", &t);
+     fprintf(stderr, "%s.%06ld [%s] ", buffer, tm.tv_usec, tag[level]);
 }
 
 static int warn_logger(level_t level, char *format, ...) {
