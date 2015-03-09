@@ -104,5 +104,5 @@ yacad_tasklist_t *yacad_tasklist_new(yacad_conf_t *conf) {
      result->conf = conf;
      result->tasklist_per_runner = cad_new_hash(stdlib_memory, cad_hash_strings);
      // TODO read from database
-     return &(result->fn);
+     return I(result);
 }

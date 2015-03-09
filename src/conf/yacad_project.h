@@ -17,13 +17,21 @@
 #ifndef __YACAD_PROJECT_H__
 #define __YACAD_PROJECT_H__
 
+#include <sys/time.h>
+
 #include "yacad.h"
 
 typedef struct yacad_project_s yacad_project_t;
 
+typedef void (*on_success_action)(yacad_project_t *this, void *data);
+
+typedef struct timeval (*yacad_project_next_time_fn)(yacad_project_t *this);
+typedef bool_t (*yacad_project_check_fn)(yacad_project_t *this, on_success_action on_success, void *data);
 typedef void (*yacad_project_free_fn)(yacad_project_t *this);
 
 struct yacad_project_s {
+     yacad_project_next_time_fn next_time;
+     yacad_project_check_fn check;
      yacad_project_free_fn free;
 };
 

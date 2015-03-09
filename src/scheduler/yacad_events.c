@@ -187,5 +187,5 @@ yacad_events_t *yacad_events_new(void) {
      result->events->on_write(result->events, (cad_on_descriptor_action)do_write);
      result->events->on_exception(result->events, (cad_on_descriptor_action)do_exception);
      cleanup(result);
-     return &(result->fn);
+     return I(result);
 }

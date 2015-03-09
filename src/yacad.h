@@ -17,6 +17,8 @@
 #ifndef __YACAD_H__
 #define __YACAD_H__
 
+#define I(impl) (&((impl)->fn))
+
 typedef enum {
      false=0,
      true

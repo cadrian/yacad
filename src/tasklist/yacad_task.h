@@ -17,6 +17,8 @@
 #ifndef __YACAD_TASK_H__
 #define __YACAD_TASK_H__
 
+#include <sys/time.h>
+
 #include "yacad.h"
 
 typedef struct yacad_task_s yacad_task_t;
@@ -25,7 +27,6 @@ typedef int (*yacad_task_get_id_fn)(yacad_task_t *this);
 typedef const char *(*yacad_task_get_project_name_fn)(yacad_task_t *this);
 typedef const char *(*yacad_task_get_runner_name_fn)(yacad_task_t *this);
 typedef const char *(*yacad_task_get_action_fn)(yacad_task_t *this);
-
 typedef const char *(*yacad_task_serialize_fn)(yacad_task_t *this);
 typedef void (*yacad_task_free_fn)(yacad_task_t *this);
 

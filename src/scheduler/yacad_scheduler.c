@@ -22,11 +22,17 @@
 #include "yacad_scheduler.h"
 #include "yacad_event.h"
 #include "tasklist/yacad_tasklist.h"
+#include "conf/yacad_project.h"
 
 #define STATE_INIT     0
 #define STATE_RUNNING  1
 #define STATE_STOPPING 2
 #define STATE_STOPPED  3
+
+typedef struct {
+     struct timeval time; // time of the next check
+     bool_t delivered; // true when the event is delivered (to avoid double events)
+} next_check_t;
 
 typedef struct yacad_scheduler_impl_s {
      yacad_scheduler_t fn;
@@ -34,6 +40,7 @@ typedef struct yacad_scheduler_impl_s {
      yacad_tasklist_t *tasklist;
      cad_event_queue_t *event_queue;
      volatile int state;
+     volatile next_check_t next_check;
 } yacad_scheduler_impl_t;
 
 static bool_t is_done(yacad_scheduler_impl_t *this) {
@@ -79,25 +86,83 @@ static void do_stop(yacad_event_t *event, yacad_scheduler_impl_t *this) {
      this->state = STATE_STOPPED;
 }
 
-static void event_callback(yacad_event_t *event, yacad_task_t *task, yacad_scheduler_impl_t *this) {
-     this->tasklist->add(this->tasklist, task);
+static void iterate_next_check(cad_hash_t *tasklist_per_runner, int index, const char *key, yacad_project_t *project, yacad_scheduler_impl_t *this) {
+     struct timeval tm = project->next_time(project);
+     if (timercmp(&tm, &(this->next_check.time), <)) {
+          this->next_check.time = tm;
+          this->next_check.delivered = false;
+     }
+}
+
+static void next_check(yacad_scheduler_impl_t *this) {
+     cad_hash_t *projects = this->conf->get_projects(this->conf);
+     struct timeval tm;
+     struct tm *t;
+     char tmbuf[64];
+
+     gettimeofday(&tm, NULL);
+     tm.tv_sec += 3600; // max one hour without a check
+     tm.tv_usec = 0;
+     this->next_check.time = tm;
+     projects->iterate(projects, (cad_hash_iterator_fn)iterate_next_check, this);
+
+     if (this->conf->log(debug, "Next check time: ") > 0) {
+          t = localtime((time_t*)&(tm.tv_sec));
+          strftime(tmbuf, sizeof(tmbuf), "%Y-%m-%d %H:%M:%S", t);
+          this->conf->log(debug, "%s\n", tmbuf);
+     }
+}
+
+static void on_check_project(yacad_project_t *project, yacad_scheduler_impl_t *this) {
+     // TODO add task because the check succeeded
+     //this->tasklist->add(this->tasklist, task);
+}
+
+static void iterate_check_project(cad_hash_t *tasklist_per_runner, int index, const char *key, yacad_project_t *project, yacad_scheduler_impl_t *this) {
+     project->check(project, (on_success_action)on_check_project, this);
+}
+
+static void do_check(yacad_event_t *event, yacad_event_callback callback, yacad_scheduler_impl_t *this) {
+     cad_hash_t *projects = this->conf->get_projects(this->conf);
+     projects->iterate(projects, (cad_hash_iterator_fn)iterate_check_project, this);
+     this->next_check.delivered = false;
 }
 
 static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
-     // runs in the event queue thread, that's why I don't want to use this->conf - not sure if the conf will be stateless
+     // runs in the event queue thread, that's why I don't want to use this->conf - not sure if the conf will be stateless event though it should be
+
+     yacad_event_t *result = NULL;
+
      static yacad_conf_t *conf = NULL;
+     struct timeval now;
      if (conf == NULL) {
           conf = yacad_conf_new();
      }
-     sleep(1); // 1 event per second
+
+     if (this->next_check.delivered) {
+          // don't override yet, we wait for the project currently being checked to have finished.
+     } else {
+          next_check(this);
+     }
+
+     sleep(1); // roughly 1 event per second (no need to be accurate here; we just have to regularly check if we must stop)
+
      switch(this->state) {
      case STATE_RUNNING:
-          return yacad_event_new_conf(conf, (yacad_event_callback)event_callback, this);
+          if (!this->next_check.delivered) {
+               this->next_check.delivered = true;
+               gettimeofday(&now, NULL);
+               if (timercmp(&(this->next_check.time), &now, <)) {
+                    result = yacad_event_new_action((yacad_event_action)do_check, 0, this);
+               }
+          }
+          break;
      case STATE_STOPPING:
-          return yacad_event_new_action((yacad_event_action)do_stop, 0, this);
-     default:
-          return NULL;
+          result = yacad_event_new_action((yacad_event_action)do_stop, 0, this);
+          break;
      }
+
+     return result;
 }
 
 static yacad_scheduler_t impl_fn = {
@@ -111,10 +176,11 @@ yacad_scheduler_t *yacad_scheduler_new(yacad_conf_t *conf) {
      yacad_scheduler_impl_t *result = malloc(sizeof(yacad_scheduler_impl_t));
      result->fn = impl_fn;
      result->conf = conf;
+     result->next_check.delivered = false;
      result->state = STATE_INIT;
      result->tasklist = yacad_tasklist_new(conf);
      result->event_queue = cad_new_event_queue_pthread(stdlib_memory, (provide_data_fn)event_provider, 16);
      result->event_queue->start(result->event_queue, result);
      result->state = STATE_RUNNING;
-     return &(result->fn);
+     return I(result);
 }

@@ -70,51 +70,63 @@ static void taglog(level_t level) {
 }
 
 static int warn_logger(level_t level, char *format, ...) {
-   int result = 0;
-   va_list arg;
-   if(level <= warn) {
-      va_start(arg, format);
-      taglog(level);
-      result = vfprintf(stderr, format, arg);
-      va_end(arg);
-   }
-   return result;
+     static bool_t nl = true;
+     int result = 0;
+     va_list arg;
+     if(level <= warn) {
+          va_start(arg, format);
+          if (nl) {
+               taglog(level);
+          }
+          result = vfprintf(stderr, format, arg);
+          va_end(arg);
+          nl = format[strlen(format)-1] == '\n';
+     }
+     return result;
 }
 
 static int info_logger(level_t level, char *format, ...) {
-   int result = 0;
-   va_list arg;
-   if(level <= info) {
-      va_start(arg, format);
-      taglog(level);
-      result = vfprintf(stderr, format, arg);
-      va_end(arg);
-   }
-   return result;
+     static bool_t nl = true;
+     int result = 0;
+     va_list arg;
+     if(level <= info) {
+          va_start(arg, format);
+          if (nl) {
+               taglog(level);
+          }
+          result = vfprintf(stderr, format, arg);
+          va_end(arg);
+          nl = format[strlen(format)-1] == '\n';
+     }
+     return result;
 }
 
 static int debug_logger(level_t level, char *format, ...) {
-   int result = 0;
-   va_list arg;
-   if(level <= debug) {
-      va_start(arg, format);
-      taglog(level);
-      result = vfprintf(stderr, format, arg);
-      va_end(arg);
-   }
-   return result;
+     static bool_t nl = true;
+     int result = 0;
+     va_list arg;
+     if(level <= debug) {
+          va_start(arg, format);
+          if (nl) {
+               taglog(level);
+          }
+          result = vfprintf(stderr, format, arg);
+          va_end(arg);
+          nl = format[strlen(format)-1] == '\n';
+     }
+     return result;
 }
 
 static const char *get_database_name(yacad_conf_impl_t *this) {
      return this->database_name;
 }
 
-static yacad_project_t *get_project(yacad_conf_impl_t *this, const char *project_name) {
-     return this->projects->get(this->projects, project_name);
+static cad_hash_t *get_projects(yacad_conf_impl_t *this) {
+     return this->projects;
 }
 
-static yacad_runner_t *get_runner(yacad_conf_impl_t *this, const char *runner_name) {
-     return this->runners->get(this->runners, runner_name);
+static cad_hash_t *get_runners(yacad_conf_impl_t *this) {
+     return this->runners;
 }
 
 static void free_(yacad_conf_impl_t *this) {
@@ -237,8 +249,8 @@ static yacad_conf_t impl_fn =  {
      .log = debug_logger,
      .get_database_name = (yacad_conf_get_database_name_fn)get_database_name,
      .next_task = (yacad_conf_next_task_fn)next_task,
-     .get_project = (yacad_conf_get_project_fn)get_project,
-     .get_runner = (yacad_conf_get_runner_fn)get_runner,
+     .get_projects = (yacad_conf_get_projects_fn)get_projects,
+     .get_runners = (yacad_conf_get_runners_fn)get_runners,
      .free = (yacad_conf_free_fn)free_,
 };
 
@@ -303,7 +315,7 @@ static void visit_object(conf_visitor_t *this, json_object_t *visited) {
           *next_path = '\0';
           value = visited->get(visited, key);
           if (value != NULL) {
-               value->accept(value, &(this->fn));
+               value->accept(value, I(this));
           }
      }
 }
@@ -323,7 +335,7 @@ static void visit_array(conf_visitor_t *this, json_array_t *visited) {
           index = atoi(key);
           value = visited->get(visited, index);
           if (value != NULL) {
-               value->accept(value, &(this->fn));
+               value->accept(value, I(this));
           }
      }
 }
@@ -384,7 +396,7 @@ static void set_logger(yacad_conf_impl_t *this) {
      size_t i, n;
      char *level;
      json_string_t *jlevel;
-     this->json->accept(this->json, &(v->fn));
+     this->json->accept(this->json, I(v));
      if (v->found) {
           jlevel = v->value.string;
           n = jlevel->count(jlevel);
@@ -400,7 +412,7 @@ static void set_logger(yacad_conf_impl_t *this) {
                fprintf(stderr, "**** Unknown level: '%s' (ignored)\n", level);
           }
      }
-     v->fn.free(&(v->fn));
+     I(v)->free(I(v));
 }
 
 yacad_conf_t *yacad_conf_new(void) {
@@ -429,5 +441,5 @@ yacad_conf_t *yacad_conf_new(void) {
           result->json = ref->json;
      }
 
-     return &(result->fn);
+     return I(result);
 }

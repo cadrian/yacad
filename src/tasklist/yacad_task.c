@@ -79,5 +79,5 @@ yacad_task_t *yacad_task_new(int id, const char *project_name, const char *runne
      result->project_name = strdup(project_name);
      result->runner_name = strdup(runner_name);
      result->action = strdup(action);
-     return &(result->fn);
+     return I(result);
 }
