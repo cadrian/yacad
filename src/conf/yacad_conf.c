@@ -337,11 +337,10 @@ static void set_logger(yacad_conf_impl_t *this) {
 }
 
 yacad_conf_t *yacad_conf_new(void) {
-     // The actual conf is read only once; after, the JSON object is cloned.
+     // The actual conf is read only once; after, the JSON object is shared.
      static yacad_conf_impl_t *ref = NULL;
 
      yacad_conf_impl_t *result = malloc(sizeof(yacad_conf_impl_t));
-     json_visitor_t *cloner;
      int i;
 
      result->fn = impl_fn;
@@ -360,9 +359,7 @@ yacad_conf_t *yacad_conf_new(void) {
           }
           ref = result;
      } else {
-          cloner = json_clone(&result->json, stdlib_memory);
-          ref->json->accept(ref->json, cloner);
-          cloner->free(cloner);
+          result->json = ref->json;
      }
 
      return &(result->fn);
