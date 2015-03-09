@@ -30,6 +30,7 @@
 #include <json.h>
 
 #include "yacad_conf.h"
+#include "yacad_project.h"
 
 static const char *dirs[] = {
      "/etc/xdg/yacad",
@@ -282,6 +283,8 @@ static void read_conf(yacad_conf_impl_t *this, const char *dir) {
      }
 }
 
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+
 typedef struct {
      json_visitor_t fn;
      yacad_conf_impl_t *conf;
@@ -295,7 +298,7 @@ typedef struct {
           json_number_t *number;
           json_const_t *constant;
      } value;
-     char path[0];
+     const char *pathformat;
 } conf_visitor_t;
 
 static void free_visitor(conf_visitor_t *this) {
@@ -361,7 +364,34 @@ static void visit_const(conf_visitor_t *this, json_const_t *visited) {
      }
 }
 
-static __attribute__((format(printf, 3, 4))) conf_visitor_t *conf_visitor(yacad_conf_impl_t *conf, json_type_t expected_type, const char *pathformat, ...) {
+static void vvisit(json_value_t *value, conf_visitor_t *v, va_list vargs) {
+     va_list args;
+     int n;
+     char *path;
+
+     va_copy(args, vargs);
+     n = vsnprintf("", 0, v->pathformat, args) + 1;
+     va_end(args);
+
+     path = malloc(n);
+
+     va_copy(args, vargs);
+     vsnprintf(path, n, v->pathformat, args);
+     va_end(args);
+
+     v->current_path = path;
+     value->accept(value, I(v));
+     free(path);
+}
+
+static void visit(json_value_t *value, conf_visitor_t *v, ...) {
+     va_list args;
+     va_start(args, v);
+     vvisit(value, v, args);
+     va_end(args);
+}
+
+static conf_visitor_t *conf_visitor(yacad_conf_impl_t *conf, json_type_t expected_type, const char *pathformat) {
      static struct json_visitor visitor = {
           .free = (json_visit_free_fn)free_visitor,
           .visit_object = (json_visit_object_fn)visit_object,
@@ -370,24 +400,12 @@ static __attribute__((format(printf, 3, 4))) conf_visitor_t *conf_visitor(yacad_
           .visit_number = (json_visit_number_fn)visit_number,
           .visit_const = (json_visit_const_fn)visit_const,
      };
-     conf_visitor_t *result;
-     va_list args;
-     int n;
-
-     va_start(args, pathformat);
-     n = vsnprintf("", 0, pathformat, args) + 1;
-     va_end(args);
-
-     result = malloc(sizeof(conf_visitor_t) + n);
-     va_start(args, pathformat);
-     vsnprintf(result->path, n, pathformat, args);
-     va_end(args);
-
+     conf_visitor_t *result = malloc(sizeof(conf_visitor_t));
      result->fn = visitor;
      result->conf = conf;
      result->found = false;
      result->expected_type = expected_type;
-     result->current_path = result->path;
+     result->pathformat = pathformat;
      return result;
 }
 
@@ -396,12 +414,12 @@ static void set_logger(yacad_conf_impl_t *this) {
      size_t i, n;
      char *level;
      json_string_t *jlevel;
-     this->json->accept(this->json, I(v));
+     visit(this->json, v);
      if (v->found) {
           jlevel = v->value.string;
-          n = jlevel->count(jlevel);
-          level = alloca(n+1);
-          i = jlevel->utf8(jlevel, level, n+1);
+          n = jlevel->count(jlevel) + 1;
+          level = alloca(n);
+          i = jlevel->utf8(jlevel, level, n);
           if (!strncmp("debug", level, i)) {
                this->fn.log = debug_logger;
           } else if (!strncmp("info", level, i)) {
@@ -412,6 +430,60 @@ static void set_logger(yacad_conf_impl_t *this) {
                fprintf(stderr, "**** Unknown level: '%s' (ignored)\n", level);
           }
      }
+     I(v)->free(I(v));
+}
+
+static char *json_to_string(conf_visitor_t *v, json_value_t *value, ...) {
+     va_list args;
+     size_t n;
+     json_string_t *string;
+     char *result = NULL;
+     va_start(args, value);
+     vvisit(value, v, args);
+     va_end(args);
+     if (v->found) {
+          string = v->value.string;
+          n = string->utf8(string, "", 0) + 1;
+          result = malloc(n);
+          string->utf8(string, result, n);
+     }
+     return result;
+}
+
+static void read_projects(yacad_conf_impl_t *this) {
+     conf_visitor_t *v = conf_visitor(this, json_type_array, "projects");
+     conf_visitor_t *p = conf_visitor(this, json_type_string, "%s");
+     json_array_t *projects;
+     json_value_t *value;
+     yacad_project_t *project;
+     char *name, *scm, *root_path, *upstream_url, *cron;
+     int i, n;
+     visit(this->json, v);
+     if (v->found) {
+          projects = v->value.array;
+          n = projects->count(projects);
+          for (i = 0; i < n; i++) {
+               value = projects->get(projects, i);
+               name = json_to_string(p, value, "name");
+               scm = json_to_string(p, value, "scm");
+               root_path = json_to_string(p, value, "root_path");
+               upstream_url = json_to_string(p, value, "upstream_url");
+               cron = json_to_string(p, value, "cron");
+               if (this->projects->get(this->projects, name) == NULL) {
+                    I(this)->log(debug, "New project: %s [%s]\n", name, cron);
+                    project = yacad_project_new(I(this), name, scm, root_path, upstream_url, cron);
+                    this->projects->set(this->projects, name, project);
+               } else {
+                    I(this)->log(warn, "**** Duplicate project name: %s\n", name);
+               }
+               free(name);
+               free(scm);
+               free(root_path);
+               free(upstream_url);
+               free(cron);
+          }
+     }
+     I(p)->free(I(p));
      I(v)->free(I(v));
 }
 
@@ -435,6 +507,7 @@ yacad_conf_t *yacad_conf_new(void) {
           }
           if (result->json != NULL) {
                set_logger(result);
+               read_projects(result);
           }
           ref = result;
      } else {

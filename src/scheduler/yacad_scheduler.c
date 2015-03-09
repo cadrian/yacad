@@ -87,7 +87,7 @@ static void do_stop(yacad_event_t *event, yacad_scheduler_impl_t *this) {
 }
 
 static void iterate_next_check(cad_hash_t *tasklist_per_runner, int index, const char *key, yacad_project_t *project, yacad_scheduler_impl_t *this) {
-     struct timeval tm = project->next_time(project);
+     struct timeval tm = project->next_check(project);
      if (timercmp(&tm, &(this->next_check.time), <)) {
           this->next_check.time = tm;
           this->next_check.delivered = false;
