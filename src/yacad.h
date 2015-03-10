@@ -18,6 +18,7 @@
 #define __YACAD_H__
 
 #include <sys/time.h>
+#include <sys/types.h>
 
 #define I(impl) (&((impl)->fn))
 
@@ -29,5 +30,6 @@ typedef enum {
 #define bool2str(flag) ((flag) ? "true" : "false")
 
 const char *datetime(time_t t, char *tmbuf);
+int mkpath(const char *dir, mode_t mode);
 
 #endif /* __YACAD_H__ */

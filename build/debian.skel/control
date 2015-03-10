@@ -2,7 +2,7 @@ Source: exp
 Section: admin
 Priority: optional
 Maintainer: Cyril Adrian <cyril.adrian@gmail.com>
-Build-Depends: debhelper (>= 9), libcad-dev (>> 0.0.2), libpcre3-dev
+Build-Depends: debhelper (>= 9), libcad-dev (>> 0.0.2), libpcre3-dev, libgit2-dev
 Build-Depends-Indep: doxygen, texlive-fonts-extra
 Standards-Version: 3.9.5
 Homepage: https://github.com/cadrian/exp
