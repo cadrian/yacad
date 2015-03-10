@@ -38,17 +38,19 @@ typedef struct yacad_cron_impl_s {
 #define BIT_0(field, bit) do { (field) &= ~(1UL << (bit)); } while(0)
 #define ISBIT(field, bit) (((field) >> (bit)) & 1UL)
 
-static bool_t lookup(unsigned long field, int *min, int max) {
+static bool_t lookup(unsigned long field, int *min, int max, const char *fieldname) {
      int i;
      bool_t result = false;
      for (i = *min; !result && i < max; i++) {
           if (ISBIT(field, i)) {
+               fprintf(stderr, "lookup %s: found %2d\n", fieldname, i);
                *min = i;
                result = true;
           }
      }
      if (!result) {
           *min = *min + 1;
+          fprintf(stderr, "lookup %s: NOT found => %2d\n", fieldname, *min);
      }
      return result;
 }
@@ -63,19 +65,20 @@ static struct timeval next(yacad_cron_impl_t *this) {
      localtime_r(&t, &tm);
      tm.tm_sec = 0;
      tm.tm_yday = 0;
-     tm.tm_min++;
 
      do {
           /* inspired by http://stackoverflow.com/questions/321494/calculate-when-a-cron-job-will-be-executed-then-next-time */
-          if (!lookup(this->spec.mon, &(tm.tm_mon), 12)) {
+          t = mktime(&tm);
+          localtime_r(&t, &tm);
+          if (!lookup(this->spec.mon, &(tm.tm_mon), 12, "month")) {
                tm.tm_mday = tm.tm_wday = tm.tm_hour = tm.tm_min = 0;
-          } else if (!lookup(this->spec.dom, &(tm.tm_mday), 31)) {
+          } else if (!lookup(this->spec.dom, &(tm.tm_mday), 31, "day of month")) {
                tm.tm_hour = tm.tm_min = 0;
-          } else if (!lookup(this->spec.dow, &(tm.tm_wday), 7)) {
+          } else if (!lookup(this->spec.dow, &(tm.tm_wday), 7, "day of week")) {
                tm.tm_hour = tm.tm_min = 0;
-          } else if (!lookup(this->spec.hour, &(tm.tm_hour), 24)) {
+          } else if (!lookup(this->spec.hour, &(tm.tm_hour), 24, "hour")) {
                tm.tm_min = 0;
-          } else if (!lookup(this->spec.min, &(tm.tm_min), 60)) {
+          } else if (!lookup(this->spec.min, &(tm.tm_min), 60, "minute")) {
           } else {
                done = true;
           }
@@ -165,7 +168,7 @@ static unsigned long parse_field_list(const char *field, int *offset, int max) {
      return result;
 }
 
-static unsigned long parse_field(const char *field, int *offset, int max, const char *fieldname) {
+static unsigned long parse_field(const char *field, int *offset, int max) {
      unsigned long result;
      int i;
      switch (field[*offset]) {
@@ -180,7 +183,6 @@ static unsigned long parse_field(const char *field, int *offset, int max, const 
      default:
           result = parse_field_list(field, offset, max);
      }
-     fprintf(stderr, "%s = %0lx\n", fieldname, result);
      return result;
 }
 
@@ -211,15 +213,15 @@ yacad_cron_t *yacad_cron_parse(const char *cronspec) {
      result->fn = impl_fn;
 
      skip_blanks(cronspec, &offset);
-     result->spec.min = parse_field(cronspec, &offset, 60, "min");
+     result->spec.min = parse_field(cronspec, &offset, 60);
      skip_blanks(cronspec, &offset);
-     result->spec.hour = parse_field(cronspec, &offset, 24, "hour");
+     result->spec.hour = parse_field(cronspec, &offset, 24);
      skip_blanks(cronspec, &offset);
-     result->spec.dom = parse_field(cronspec, &offset, 31, "dom");
+     result->spec.dom = parse_field(cronspec, &offset, 31);
      skip_blanks(cronspec, &offset);
-     result->spec.mon = parse_field(cronspec, &offset, 12, "mon");
+     result->spec.mon = parse_field(cronspec, &offset, 12);
      skip_blanks(cronspec, &offset);
-     result->spec.dow = parse_field(cronspec, &offset, 7, "dow");
+     result->spec.dow = parse_field(cronspec, &offset, 7);
 
      return I(result);
 }

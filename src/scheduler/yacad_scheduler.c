@@ -26,14 +26,18 @@
 #include "tasklist/yacad_tasklist.h"
 #include "conf/yacad_project.h"
 
-#define STATE_INIT     0
-#define STATE_RUNNING  1
-#define STATE_STOPPING 2
-#define STATE_STOPPED  3
+typedef enum {
+     state_init = 0, state_running, state_stopping, state_stopped
+} state_t;
+
+typedef enum {
+     check_state_ready = 0, check_state_checking, check_state_done
+} check_state_t;
 
 typedef struct {
      struct timeval time; // time of the next check
-     bool_t running; // true when the event is running (to avoid double events)
+     check_state_t state; // to avoid double events
+     int confgen;
 } next_check_t;
 
 typedef struct yacad_scheduler_impl_s {
@@ -41,7 +45,7 @@ typedef struct yacad_scheduler_impl_s {
      yacad_conf_t *conf;
      yacad_tasklist_t *tasklist;
      cad_event_queue_t *event_queue;
-     volatile int state;
+     volatile state_t state;
      volatile next_check_t next_check;
      pthread_mutex_t lock; /* protects the event provider thread and the volatile variables */
 } yacad_scheduler_impl_t;
@@ -68,7 +72,7 @@ static void prepare(yacad_scheduler_impl_t *this, yacad_events_t *events) {
           exit(1);
      }
 
-     if (this->state < STATE_STOPPED) {
+     if (this->state < state_stopped) {
           fd = this->event_queue->get_fd(this->event_queue);
           events->on_read(events, (on_event_action)run, fd, this);
      }
@@ -83,8 +87,8 @@ static void stop(yacad_scheduler_impl_t *this) {
           exit(1);
      }
 
-     if (this->state < STATE_STOPPING) {
-          this->state = STATE_STOPPING;
+     if (this->state < state_stopping) {
+          this->state = state_stopping;
      }
 
      pthread_mutex_unlock(&(this->lock));
@@ -107,7 +111,7 @@ static void do_stop(yacad_event_t *event, yacad_scheduler_impl_t *this) {
           exit(1);
      }
 
-     this->state = STATE_STOPPED;
+     this->state = state_stopped;
 
      pthread_mutex_unlock(&(this->lock));
 }
@@ -154,7 +158,7 @@ static void do_check(yacad_event_t *event, yacad_event_callback callback, yacad_
           this->conf->log(warn, "Fatal error: could not acquire lock\n");
           exit(1);
      }
-     this->next_check.running = false;
+     this->next_check.state = check_state_done;
      pthread_mutex_unlock(&(this->lock));
 }
 
@@ -162,6 +166,7 @@ static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
      // runs in the event queue thread, that's why I don't want to use this->conf - not sure if the conf will be stateless event though it should be
 
      yacad_event_t *result = NULL;
+     int confgen;
 
      static yacad_conf_t *conf = NULL;
      struct timeval now;
@@ -175,26 +180,40 @@ static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
           exit(1);
      }
 
-     if (this->next_check.running) {
+     switch(this->next_check.state) {
+     case check_state_checking:
           // don't override yet, we wait for the project currently being checked to have finished.
-     } else {
+          break;
+     case check_state_ready:
+          confgen = this->conf->generation(this->conf);
+          if (confgen != this->next_check.confgen) {
+               next_check(this);
+               this->next_check.confgen = confgen;
+          }
+          break;
+     case check_state_done:
           next_check(this);
+          this->next_check.state = check_state_ready;
+          break;
      }
 
      sleep(1); // roughly 1 event per second (no need to be accurate here; we just have to regularly check if we must stop)
 
      switch(this->state) {
-     case STATE_RUNNING:
-          if (!this->next_check.running) {
+     case state_running:
+          if (this->next_check.state == check_state_ready) {
                gettimeofday(&now, NULL);
                if (timercmp(&(this->next_check.time), &now, <)) {
-                    this->next_check.running = true;
+                    this->next_check.state = check_state_checking;
                     result = yacad_event_new_action((yacad_event_action)do_check, 0, this);
                }
           }
           break;
-     case STATE_STOPPING:
+     case state_stopping:
           result = yacad_event_new_action((yacad_event_action)do_stop, 0, this);
+          break;
+     default:
+          // ignored
           break;
      }
      pthread_mutex_unlock(&(this->lock));
@@ -213,11 +232,12 @@ yacad_scheduler_t *yacad_scheduler_new(yacad_conf_t *conf) {
      yacad_scheduler_impl_t *result = malloc(sizeof(yacad_scheduler_impl_t));
      result->fn = impl_fn;
      result->conf = conf;
-     result->next_check.running = false;
-     result->state = STATE_INIT;
+     result->next_check.state = check_state_ready;
+     result->next_check.confgen = -1;
+     result->state = state_init;
      result->tasklist = yacad_tasklist_new(conf);
      result->event_queue = cad_new_event_queue_pthread(stdlib_memory, (provide_data_fn)event_provider, 16);
-     result->state = STATE_RUNNING;
+     result->state = state_running;
      pthread_mutex_init(&(result->lock), NULL);
      result->event_queue->start(result->event_queue, result);
      return I(result);

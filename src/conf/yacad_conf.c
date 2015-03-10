@@ -56,6 +56,7 @@ typedef struct yacad_conf_impl_s {
      cad_hash_t *projects;
      cad_hash_t *runners;
      json_value_t *json;
+     int generation;
 } yacad_conf_impl_t;
 
 static void taglog(level_t level) {
@@ -131,6 +132,10 @@ static cad_hash_t *get_projects(yacad_conf_impl_t *this) {
 
 static cad_hash_t *get_runners(yacad_conf_impl_t *this) {
      return this->runners;
+}
+
+static int generation(yacad_conf_impl_t *this) {
+     return this->generation;
 }
 
 static void free_(yacad_conf_impl_t *this) {
@@ -255,6 +260,7 @@ static yacad_conf_t impl_fn =  {
      .next_task = (yacad_conf_next_task_fn)next_task,
      .get_projects = (yacad_conf_get_projects_fn)get_projects,
      .get_runners = (yacad_conf_get_runners_fn)get_runners,
+     .generation = (yacad_conf_generation_fn)generation,
      .free = (yacad_conf_free_fn)free_,
 };
 
@@ -503,6 +509,7 @@ yacad_conf_t *yacad_conf_new(void) {
      result->projects = cad_new_hash(stdlib_memory, cad_hash_strings);
      result->runners = cad_new_hash(stdlib_memory, cad_hash_strings);
      result->json = NULL;
+     result->generation = 0;
 
      if (ref == NULL) {
           for (i = 0; dirs[i] != NULL && result->json == NULL; i++) {
