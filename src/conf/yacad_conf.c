@@ -32,6 +32,7 @@
 
 #include "yacad_conf.h"
 #include "yacad_project.h"
+#include "yacad_cron.h"
 
 static const char *dirs[] = {
      "/etc/xdg/yacad",
@@ -65,13 +66,11 @@ static void taglog(level_t level) {
      static char *tag[] = {
           "WARN ",
           "INFO ",
-          "DEBUG"
+          "DEBUG",
+          "TRACE",
      };
-     struct tm t;
      gettimeofday(&tm, NULL);
-     localtime_r(&tm.tv_sec, &t);
-     strftime(buffer, 20, "%Y/%m/%d %H:%M:%S", &t);
-     fprintf(stderr, "%s.%06ld [%s] ", buffer, tm.tv_usec, tag[level]);
+     fprintf(stderr, "%s.%06ld [%s] ", datetime(tm.tv_sec, buffer), tm.tv_usec, tag[level]);
 }
 
 static int warn_logger(level_t level, char *format, ...) {
@@ -111,6 +110,22 @@ static int debug_logger(level_t level, char *format, ...) {
      int result = 0;
      va_list arg;
      if(level <= debug) {
+          va_start(arg, format);
+          if (nl) {
+               taglog(level);
+          }
+          result = vfprintf(stderr, format, arg);
+          va_end(arg);
+          nl = format[strlen(format)-1] == '\n';
+     }
+     return result;
+}
+
+static int trace_logger(level_t level, char *format, ...) {
+     static bool_t nl = true;
+     int result = 0;
+     va_list arg;
+     if(level <= trace) {
           va_start(arg, format);
           if (nl) {
                taglog(level);
@@ -429,12 +444,14 @@ static void set_logger(yacad_conf_impl_t *this) {
           n = jlevel->count(jlevel) + 1;
           level = alloca(n);
           i = jlevel->utf8(jlevel, level, n);
-          if (!strncmp("debug", level, i)) {
-               this->fn.log = debug_logger;
+          if (!strncmp("warn", level, i)) {
+               this->fn.log = warn_logger;
           } else if (!strncmp("info", level, i)) {
                this->fn.log = info_logger;
-          } else if (!strncmp("warn", level, i)) {
-               this->fn.log = warn_logger;
+          } else if (!strncmp("debug", level, i)) {
+               this->fn.log = debug_logger;
+          } else if (!strncmp("trace", level, i)) {
+               this->fn.log = trace_logger;
           } else {
                fprintf(stderr, "**** Unknown level: '%s' (ignored)\n", level);
           }
@@ -480,7 +497,7 @@ static void read_projects(yacad_conf_impl_t *this) {
                cron = json_to_string(p, value, "cron");
                if (this->projects->get(this->projects, name) == NULL) {
                     I(this)->log(info, "Adding project: %s [%s]\n", name, cron);
-                    project = yacad_project_new(I(this), name, scm, root_path, upstream_url, cron);
+                    project = yacad_project_new(I(this), name, scm, root_path, upstream_url, yacad_cron_parse(cron, I(this)));
                     this->projects->set(this->projects, name, project);
                } else {
                     I(this)->log(warn, "**** Duplicate project name: %s\n", name);

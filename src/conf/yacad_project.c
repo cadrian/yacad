@@ -18,7 +18,6 @@
 #include <time.h>
 
 #include "yacad_project.h"
-#include "yacad_cron.h"
 
 typedef struct yacad_project_impl_s {
      yacad_project_t fn;
@@ -31,7 +30,12 @@ typedef struct yacad_project_impl_s {
 } yacad_project_impl_t;
 
 static struct timeval next_check(yacad_project_impl_t *this) {
-     return this->cron->next(this->cron);
+     struct timeval result = this->cron->next(this->cron);
+     char tmbuf[20];
+     if (this->conf->log(debug, "Project \"%s\" next check time: ", this->name) > 0) {
+          this->conf->log(debug, "%s\n", datetime(result.tv_sec, tmbuf));
+     }
+     return result;
 }
 
 static bool_t *check(yacad_project_impl_t *this) {
@@ -54,7 +58,7 @@ static yacad_project_t impl_fn = {
 };
 
 yacad_project_t *yacad_project_new(yacad_conf_t *conf, const char *name, const char *scm,
-                                   const char *root_path, const char *upstream_url, const char *cron) {
+                                   const char *root_path, const char *upstream_url, yacad_cron_t *cron) {
      yacad_project_impl_t *result = malloc(sizeof(yacad_project_impl_t));
      result->fn = impl_fn;
      result->conf = conf;
@@ -62,6 +66,6 @@ yacad_project_t *yacad_project_new(yacad_conf_t *conf, const char *name, const c
      result->scm = strdup(scm);
      result->root_path = strdup(root_path);
      result->upstream_url = strdup(upstream_url);
-     result->cron = yacad_cron_parse(cron, conf);
+     result->cron = cron;
      return I(result);
 }

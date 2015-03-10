@@ -14,20 +14,15 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __YACAD_H__
-#define __YACAD_H__
+#include "yacad.h"
 
-#include <sys/time.h>
+#define DATETIME_FORMAT "%Y-%m-%d %H:%M:%S"
 
-#define I(impl) (&((impl)->fn))
-
-typedef enum {
-     false=0,
-     true
-} bool_t;
-
-#define bool2str(flag) ((flag) ? "true" : "false")
-
-const char *datetime(time_t t, char *tmbuf);
-
-#endif /* __YACAD_H__ */
+const char *datetime(time_t t, char *tmbuf) {
+     char *result = NULL;
+     struct tm tm;
+     if (localtime_r(&t, &tm) != NULL) {
+          strftime(result = tmbuf, 20, DATETIME_FORMAT, &tm);
+     }
+     return tmbuf;
+}

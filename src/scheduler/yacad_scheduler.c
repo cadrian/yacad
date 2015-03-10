@@ -114,27 +114,21 @@ static void do_stop(yacad_event_t *event, yacad_scheduler_impl_t *this) {
 
 static void iterate_next_check(cad_hash_t *tasklist_per_runner, int index, const char *key, yacad_project_t *project, yacad_scheduler_impl_t *this) {
      struct timeval tm = project->next_check(project);
-     if (timercmp(&tm, &(this->next_check.time), <)) {
+     if (this->next_check.time.tv_sec == 0 || timercmp(&tm, &(this->next_check.time), <)) {
           this->next_check.time = tm;
      }
 }
 
 static void next_check(yacad_scheduler_impl_t *this) {
      cad_hash_t *projects = this->conf->get_projects(this->conf);
-     struct timeval tm, save_tm = this->next_check.time;
-     struct tm t;
-     char tmbuf[64];
+     struct timeval tmzero = {0,0}, save_tm = this->next_check.time;
+     char tmbuf[20];
 
-     gettimeofday(&tm, NULL);
-     tm.tv_sec += 3600; // max one hour without a check
-     tm.tv_usec = 0;
-     this->next_check.time = tm;
+     this->next_check.time = tmzero;
      projects->iterate(projects, (cad_hash_iterator_fn)iterate_next_check, this);
 
      if (timercmp(&save_tm, &(this->next_check.time), !=) && this->conf->log(debug, "Next check time: ") > 0) {
-          localtime_r((time_t*)&(this->next_check.time.tv_sec), &t);
-          strftime(tmbuf, sizeof(tmbuf), "%Y-%m-%d %H:%M:%S", &t);
-          this->conf->log(debug, "%s\n", tmbuf);
+          this->conf->log(debug, "%s\n", datetime(this->next_check.time.tv_sec, tmbuf));
      }
 }
 

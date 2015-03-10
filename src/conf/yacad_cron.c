@@ -43,14 +43,14 @@ static bool_t lookup(yacad_cron_impl_t *this, unsigned long field, int *min, int
      bool_t result = false;
      for (i = *min; !result && i < max; i++) {
           if (ISBIT(field, i)) {
-               this->conf->log(debug, "lookup %s: found %2d\n", fieldname, i);
+               this->conf->log(trace, "lookup %s: found %2d\n", fieldname, i);
                *min = i;
                result = true;
           }
      }
      if (!result) {
           *min = *min + 1;
-          this->conf->log(debug, "lookup %s: NOT found => %2d\n", fieldname, *min);
+          this->conf->log(trace, "lookup %s: NOT found => %2d\n", fieldname, *min);
      }
      return result;
 }

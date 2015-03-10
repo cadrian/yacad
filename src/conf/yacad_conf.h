@@ -39,6 +39,10 @@ typedef enum {
       * Developer details, usually not useful
       */
      debug,
+     /**
+      * Developper useless details
+      */
+     trace,
 } level_t;
 
 /**
