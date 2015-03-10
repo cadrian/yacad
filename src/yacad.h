@@ -17,7 +17,7 @@
 #ifndef __YACAD_H__
 #define __YACAD_H__
 
-#include <sys/time.h>
+#include <time.h>
 #include <sys/types.h>
 
 #define I(impl) (&((impl)->fn))
