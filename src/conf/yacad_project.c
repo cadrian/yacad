@@ -62,6 +62,6 @@ yacad_project_t *yacad_project_new(yacad_conf_t *conf, const char *name, const c
      result->scm = strdup(scm);
      result->root_path = strdup(root_path);
      result->upstream_url = strdup(upstream_url);
-     result->cron = yacad_cron_parse(cron);
+     result->cron = yacad_cron_parse(cron, conf);
      return I(result);
 }

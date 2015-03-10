@@ -17,7 +17,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <time.h>
-#include <pthread.h>
 
 #include <cad_event_queue.h>
 
@@ -47,7 +46,6 @@ typedef struct yacad_scheduler_impl_s {
      cad_event_queue_t *event_queue;
      volatile state_t state;
      volatile next_check_t next_check;
-     pthread_mutex_t lock; /* protects the event provider thread and the volatile variables */
 } yacad_scheduler_impl_t;
 
 static bool_t is_done(yacad_scheduler_impl_t *this) {
@@ -64,34 +62,36 @@ static void run(int fd, yacad_scheduler_impl_t *this) {
      }
 }
 
-static void prepare(yacad_scheduler_impl_t *this, yacad_events_t *events) {
-     int fd;
+typedef struct {
+     yacad_scheduler_impl_t *this;
+     yacad_events_t *events;
+} synchronized_prepare_args_t;
 
-     if (0 != pthread_mutex_lock(&(this->lock))) {
-          this->conf->log(warn, "Fatal error: could not acquire lock\n");
-          exit(1);
-     }
+static void synchronized_prepare(synchronized_prepare_args_t *args) {
+     yacad_scheduler_impl_t *this = args->this;
+     yacad_events_t *events = args->events;
+     int fd;
 
      if (this->state < state_stopped) {
           fd = this->event_queue->get_fd(this->event_queue);
           events->on_read(events, (on_event_action)run, fd, this);
      }
+}
 
-     pthread_mutex_unlock(&(this->lock));
+static void prepare(yacad_scheduler_impl_t *this, yacad_events_t *events) {
+     synchronized_prepare_args_t args = {this, events};
+     this->event_queue->synchronized(this->event_queue, (synchronized_data_fn)synchronized_prepare, &args);
 }
 
 // will stop eventually
-static void stop(yacad_scheduler_impl_t *this) {
-     if (0 != pthread_mutex_lock(&(this->lock))) {
-          this->conf->log(warn, "Fatal error: could not acquire lock\n");
-          exit(1);
-     }
-
+static void synchronized_stop(yacad_scheduler_impl_t *this) {
      if (this->state < state_stopping) {
           this->state = state_stopping;
      }
+}
 
-     pthread_mutex_unlock(&(this->lock));
+static void stop(yacad_scheduler_impl_t *this) {
+     this->event_queue->synchronized(this->event_queue, (synchronized_data_fn)synchronized_stop, this);
 }
 
 static void free_(yacad_scheduler_impl_t *this) {
@@ -101,19 +101,15 @@ static void free_(yacad_scheduler_impl_t *this) {
      free(this);
 }
 
+static void synchronized_do_stop(yacad_scheduler_impl_t *this) {
+     this->state = state_stopped;
+}
+
 static void do_stop(yacad_event_t *event, yacad_scheduler_impl_t *this) {
      while (this->event_queue->is_running(this->event_queue)) {
           this->event_queue->stop(this->event_queue);
      }
-
-     if (0 != pthread_mutex_lock(&(this->lock))) {
-          this->conf->log(warn, "Fatal error: could not acquire lock\n");
-          exit(1);
-     }
-
-     this->state = state_stopped;
-
-     pthread_mutex_unlock(&(this->lock));
+     this->event_queue->synchronized(this->event_queue, (synchronized_data_fn)synchronized_do_stop, this);
 }
 
 static void iterate_next_check(cad_hash_t *tasklist_per_runner, int index, const char *key, yacad_project_t *project, yacad_scheduler_impl_t *this) {
@@ -151,15 +147,14 @@ static void iterate_check_project(cad_hash_t *tasklist_per_runner, int index, co
      project->check(project, (on_success_action)on_check_project, this);
 }
 
+static void synchronized_check_done(yacad_scheduler_impl_t *this) {
+     this->next_check.state = check_state_done;
+}
+
 static void do_check(yacad_event_t *event, yacad_event_callback callback, yacad_scheduler_impl_t *this) {
      cad_hash_t *projects = this->conf->get_projects(this->conf);
      projects->iterate(projects, (cad_hash_iterator_fn)iterate_check_project, this);
-     if (0 != pthread_mutex_lock(&(this->lock))) {
-          this->conf->log(warn, "Fatal error: could not acquire lock\n");
-          exit(1);
-     }
-     this->next_check.state = check_state_done;
-     pthread_mutex_unlock(&(this->lock));
+     this->event_queue->synchronized(this->event_queue, (synchronized_data_fn)synchronized_check_done, this);
 }
 
 static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
@@ -173,11 +168,6 @@ static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
 
      if (conf == NULL) {
           conf = yacad_conf_new();
-     }
-
-     if (0 != pthread_mutex_lock(&(this->lock))) {
-          this->conf->log(warn, "Fatal error: could not acquire lock\n");
-          exit(1);
      }
 
      switch(this->next_check.state) {
@@ -216,7 +206,6 @@ static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
           // ignored
           break;
      }
-     pthread_mutex_unlock(&(this->lock));
 
      return result;
 }
@@ -238,7 +227,6 @@ yacad_scheduler_t *yacad_scheduler_new(yacad_conf_t *conf) {
      result->tasklist = yacad_tasklist_new(conf);
      result->event_queue = cad_new_event_queue_pthread(stdlib_memory, (provide_data_fn)event_provider, 16);
      result->state = state_running;
-     pthread_mutex_init(&(result->lock), NULL);
      result->event_queue->start(result->event_queue, result);
      return I(result);
 }

@@ -479,7 +479,7 @@ static void read_projects(yacad_conf_impl_t *this) {
                upstream_url = json_to_string(p, value, "upstream_url");
                cron = json_to_string(p, value, "cron");
                if (this->projects->get(this->projects, name) == NULL) {
-                    I(this)->log(debug, "New project: %s [%s]\n", name, cron);
+                    I(this)->log(info, "Adding project: %s [%s]\n", name, cron);
                     project = yacad_project_new(I(this), name, scm, root_path, upstream_url, cron);
                     this->projects->set(this->projects, name, project);
                } else {

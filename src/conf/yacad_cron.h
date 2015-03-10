@@ -19,6 +19,8 @@
 
 #include <sys/time.h>
 
+#include "yacad_conf.h"
+
 typedef struct yacad_cron_s yacad_cron_t;
 
 typedef struct timeval (*yacad_cron_next_fn)(yacad_cron_t *this);
@@ -29,6 +31,6 @@ struct yacad_cron_s {
      yacad_cron_free_fn free;
 };
 
-yacad_cron_t *yacad_cron_parse(const char *cronspec);
+yacad_cron_t *yacad_cron_parse(const char *cronspec, yacad_conf_t *conf);
 
 #endif /* __YACAD_CRON_H__ */

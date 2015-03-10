@@ -15,7 +15,6 @@
 */
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <time.h>
 
 #include "yacad.h"
@@ -31,6 +30,7 @@ typedef struct {
 
 typedef struct yacad_cron_impl_s {
      yacad_cron_t fn;
+     yacad_conf_t *conf;
      cronspec_t spec;
 } yacad_cron_impl_t;
 
@@ -38,19 +38,19 @@ typedef struct yacad_cron_impl_s {
 #define BIT_0(field, bit) do { (field) &= ~(1UL << (bit)); } while(0)
 #define ISBIT(field, bit) (((field) >> (bit)) & 1UL)
 
-static bool_t lookup(unsigned long field, int *min, int max, const char *fieldname) {
+static bool_t lookup(yacad_cron_impl_t *this, unsigned long field, int *min, int max, const char *fieldname) {
      int i;
      bool_t result = false;
      for (i = *min; !result && i < max; i++) {
           if (ISBIT(field, i)) {
-               fprintf(stderr, "lookup %s: found %2d\n", fieldname, i);
+               this->conf->log(debug, "lookup %s: found %2d\n", fieldname, i);
                *min = i;
                result = true;
           }
      }
      if (!result) {
           *min = *min + 1;
-          fprintf(stderr, "lookup %s: NOT found => %2d\n", fieldname, *min);
+          this->conf->log(debug, "lookup %s: NOT found => %2d\n", fieldname, *min);
      }
      return result;
 }
@@ -71,15 +71,15 @@ static struct timeval next(yacad_cron_impl_t *this) {
           /* inspired by http://stackoverflow.com/questions/321494/calculate-when-a-cron-job-will-be-executed-then-next-time */
           t = mktime(&tm);
           localtime_r(&t, &tm);
-          if (!lookup(this->spec.mon, &(tm.tm_mon), 12, "month")) {
+          if (!lookup(this, this->spec.mon, &(tm.tm_mon), 12, "month")) {
                tm.tm_mday = tm.tm_wday = tm.tm_hour = tm.tm_min = 0;
-          } else if (!lookup(this->spec.dom, &(tm.tm_mday), 31, "day of month")) {
+          } else if (!lookup(this, this->spec.dom, &(tm.tm_mday), 31, "day of month")) {
                tm.tm_hour = tm.tm_min = 0;
-          } else if (!lookup(this->spec.dow, &(tm.tm_wday), 7, "day of week")) {
+          } else if (!lookup(this, this->spec.dow, &(tm.tm_wday), 7, "day of week")) {
                tm.tm_hour = tm.tm_min = 0;
-          } else if (!lookup(this->spec.hour, &(tm.tm_hour), 24, "hour")) {
+          } else if (!lookup(this, this->spec.hour, &(tm.tm_hour), 24, "hour")) {
                tm.tm_min = 0;
-          } else if (!lookup(this->spec.min, &(tm.tm_min), 60, "minute")) {
+          } else if (!lookup(this, this->spec.min, &(tm.tm_min), 60, "minute")) {
           } else {
                done = true;
           }
@@ -207,11 +207,12 @@ static yacad_cron_t impl_fn = {
      .free = (yacad_cron_free_fn)free_,
 };
 
-yacad_cron_t *yacad_cron_parse(const char *cronspec) {
+yacad_cron_t *yacad_cron_parse(const char *cronspec, yacad_conf_t *conf) {
      yacad_cron_impl_t *result = malloc(sizeof(yacad_cron_impl_t));
      int offset = 0;
 
      result->fn = impl_fn;
+     result->conf = conf;
 
      skip_blanks(cronspec, &offset);
      result->spec.min = parse_field(cronspec, &offset, 60);
