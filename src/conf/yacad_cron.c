@@ -65,6 +65,7 @@ static struct timeval next(yacad_cron_impl_t *this) {
      localtime_r(&t, &tm);
      tm.tm_sec = 0;
      tm.tm_yday = 0;
+     tm.tm_min++;
 
      do {
           /* inspired by http://stackoverflow.com/questions/321494/calculate-when-a-cron-job-will-be-executed-then-next-time */
