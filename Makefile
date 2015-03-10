@@ -33,7 +33,7 @@ LIBYACJPINCLUDE=-I ../yacjp/include
 LIBYACJPCLEAN=libyacjpclean
 endif
 
-CFLAGS ?= -g
+CFLAGS ?= -g -D_GNU_SOURCE
 LDFLAGS ?=
 
 ifeq "$(wildcard /usr/bin/doxygen)" ""
@@ -51,7 +51,7 @@ exe: target/$(PROJECT)_core
 
 target/$(PROJECT)_core: $(OBJ) $(LIBCAD) $(LIBYACJP)
 	@echo "Compiling executable: $@"
-	$(CC) $(CFLAGS) -o $@ $(OBJ) -Wall -Werror -L target -lcad -lyacjp -lm
+	$(CC) $(CFLAGS) -o $@ $(OBJ) -Wall -Werror -L target -lcad -lyacjp -lm -lgit2
 
 target/out/%.o: src/%.c src/*.h Makefile
 	mkdir -p $(shell dirname $@)
