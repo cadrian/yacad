@@ -14,23 +14,22 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __YACAD_CRON_H__
-#define __YACAD_CRON_H__
+#ifndef __YACAD_SCM_H__
+#define __YACAD_SCM_H__
 
-#include <sys/time.h>
-
+#include "yacad.h"
 #include "yacad_conf.h"
 
-typedef struct yacad_cron_s yacad_cron_t;
+typedef struct yacad_scm_s yacad_scm_t;
 
-typedef struct timeval (*yacad_cron_next_fn)(yacad_cron_t *this);
-typedef void (*yacad_cron_free_fn)(yacad_cron_t *this);
+typedef bool_t (*yacad_scm_check_fn)(yacad_scm_t *this);
+typedef void (*yacad_scm_free_fn)(yacad_scm_t *this);
 
-struct yacad_cron_s {
-     yacad_cron_next_fn next;
-     yacad_cron_free_fn free;
+struct yacad_scm_s {
+     yacad_scm_check_fn check;
+     yacad_scm_free_fn free;
 };
 
-yacad_cron_t *yacad_cron_parse(yacad_conf_t *conf, const char *cronspec);
+yacad_scm_t *yacad_scm_new(yacad_conf_t *conf, const char *type, const char *root_path, const char *upstream_url);
 
-#endif /* __YACAD_CRON_H__ */
+#endif /* __YACAD_SCM_H__ */

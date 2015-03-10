@@ -497,7 +497,9 @@ static void read_projects(yacad_conf_impl_t *this) {
                cron = json_to_string(p, value, "cron");
                if (this->projects->get(this->projects, name) == NULL) {
                     I(this)->log(info, "Adding project: %s [%s]\n", name, cron);
-                    project = yacad_project_new(I(this), name, scm, root_path, upstream_url, yacad_cron_parse(cron, I(this)));
+                    project = yacad_project_new(I(this), name,
+                                                yacad_scm_new(I(this), scm, root_path, upstream_url),
+                                                yacad_cron_parse(I(this), cron));
                     this->projects->set(this->projects, name, project);
                } else {
                     I(this)->log(warn, "**** Duplicate project name: %s\n", name);

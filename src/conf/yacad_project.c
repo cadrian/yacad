@@ -22,12 +22,14 @@
 typedef struct yacad_project_impl_s {
      yacad_project_t fn;
      yacad_conf_t *conf;
-     char *name;
-     char *scm;
-     char *root_path;
-     char *upstream_url;
+     yacad_scm_t *scm;
      yacad_cron_t *cron;
+     char name[0];
 } yacad_project_impl_t;
+
+static const char *get_name(yacad_project_impl_t *this) {
+     return this->name;
+}
 
 static struct timeval next_check(yacad_project_impl_t *this) {
      struct timeval result = this->cron->next(this->cron);
@@ -39,33 +41,28 @@ static struct timeval next_check(yacad_project_impl_t *this) {
 }
 
 static bool_t *check(yacad_project_impl_t *this) {
-     return false;
+     return this->scm->check(this->scm);
 }
 
 static void free_(yacad_project_impl_t *this) {
-     free(this->name);
-     free(this->scm);
-     free(this->root_path);
-     free(this->upstream_url);
+     this->scm->free(this->scm);
      this->cron->free(this->cron);
      free(this);
 }
 
 static yacad_project_t impl_fn = {
-     (yacad_project_next_check_fn) next_check,
-     (yacad_project_check_fn) check,
-     (yacad_project_free_fn) free_,
+     .get_name = (yacad_project_get_name_fn) get_name,
+     .next_check = (yacad_project_next_check_fn) next_check,
+     .check = (yacad_project_check_fn) check,
+     .free = (yacad_project_free_fn) free_,
 };
 
-yacad_project_t *yacad_project_new(yacad_conf_t *conf, const char *name, const char *scm,
-                                   const char *root_path, const char *upstream_url, yacad_cron_t *cron) {
-     yacad_project_impl_t *result = malloc(sizeof(yacad_project_impl_t));
+yacad_project_t *yacad_project_new(yacad_conf_t *conf, const char *name, yacad_scm_t *scm, yacad_cron_t *cron) {
+     yacad_project_impl_t *result = malloc(sizeof(yacad_project_impl_t) + strlen(name) + 1);
      result->fn = impl_fn;
      result->conf = conf;
-     result->name = strdup(name);
-     result->scm = strdup(scm);
-     result->root_path = strdup(root_path);
-     result->upstream_url = strdup(upstream_url);
+     strcpy(result->name, name);
+     result->scm = scm;
      result->cron = cron;
      return I(result);
 }

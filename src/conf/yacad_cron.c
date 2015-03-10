@@ -207,7 +207,7 @@ static yacad_cron_t impl_fn = {
      .free = (yacad_cron_free_fn)free_,
 };
 
-yacad_cron_t *yacad_cron_parse(const char *cronspec, yacad_conf_t *conf) {
+yacad_cron_t *yacad_cron_parse(yacad_conf_t *conf, const char *cronspec) {
      yacad_cron_impl_t *result = malloc(sizeof(yacad_cron_impl_t));
      int offset = 0;
 
