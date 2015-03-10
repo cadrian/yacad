@@ -40,17 +40,17 @@ typedef struct yacad_cron_impl_s {
 
 static bool_t lookup(yacad_cron_impl_t *this, unsigned long field, int *min, int max, const char *fieldname) {
      int i;
-     bool_t result = false;
-     for (i = *min; !result && i < max; i++) {
+     bool_t result = false, done = false;
+     if (ISBIT(field, *min)) {
+          this->conf->log(trace, "lookup %s: found min %2d\n", fieldname, *min);
+          result = done = true;
+     }
+     for (i = *min + 1; !done && i < max; i++) {
           if (ISBIT(field, i)) {
                this->conf->log(trace, "lookup %s: found %2d\n", fieldname, i);
                *min = i;
-               result = true;
+               done = true;
           }
-     }
-     if (!result) {
-          *min = *min + 1;
-          this->conf->log(trace, "lookup %s: NOT found => %2d\n", fieldname, *min);
      }
      return result;
 }
