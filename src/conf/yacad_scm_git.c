@@ -59,6 +59,7 @@ static bool_t check(yacad_scm_git_t *this) {
       * git status -uno
       */
      bool_t result = false;
+     this->conf->log(info, "Updating remote: %s\n", this->upstream_url);
      if (gitcheck(this->conf, git_remote_fetch(this->remote, NULL, NULL))) {
           // TODO
      }
@@ -66,8 +67,25 @@ static bool_t check(yacad_scm_git_t *this) {
 }
 
 static void free_(yacad_scm_git_t *this) {
+     git_remote_free(this->remote);
      git_repository_free(this->repo);
      free(this);
+}
+
+static int yacad_git_sideband_progress(const char *str, int len, yacad_scm_git_t *this) {
+     this->conf->log(info, "%.*s\n", len, str);
+     return 0;
+}
+
+static int yacad_git_transfer_progress(const git_transfer_progress *stats, yacad_scm_git_t *this) {
+     this->conf->log(info, "total: %d indexed: %d received: %d local: %d\n", stats->total_objects, stats->indexed_objects, stats->received_objects, stats->local_objects);
+     return 0;
+}
+
+static int yacad_git_credentials(git_cred **out, const char *url, const char *username_from_url, unsigned int allowed_types, yacad_scm_git_t *this) {
+     // TODO one of git_cred_ssh_key_from_agent, git_cred_ssh_key_new, git_cred_userpass_plaintext_new, or git_cred_default_new
+     this->conf->log(debug, "calling default cred\n");
+     return git_cred_default_new(out) || git_cred_ssh_key_from_agent(out, username_from_url);
 }
 
 static yacad_scm_t git_fn = {
@@ -77,6 +95,7 @@ static yacad_scm_t git_fn = {
 
 yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, const char *upstream_url) {
      yacad_scm_git_t *result = malloc(sizeof(yacad_scm_git_t) + strlen(root_path) + strlen(upstream_url) + 2);
+     git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
 
      result->fn = git_fn;
      result->conf = conf;
@@ -106,6 +125,17 @@ yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, const 
                free(result);
                return NULL;
           }
+     }
+
+     callbacks.sideband_progress = (git_transport_message_cb)yacad_git_sideband_progress;
+     callbacks.transfer_progress = (git_transfer_progress_cb)yacad_git_transfer_progress;
+     callbacks.credentials  = (git_cred_acquire_cb)yacad_git_credentials;
+     callbacks.payload = result;
+     if (!gitcheck(conf, git_remote_set_callbacks(result->remote, &callbacks))) {
+          git_remote_free(result->remote);
+          git_repository_free(result->repo);
+          free(result);
+          return NULL;
      }
 
      result->root_path = result->data;
