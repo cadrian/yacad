@@ -131,41 +131,53 @@ static yacad_scm_t git_fn = {
      (yacad_scm_free_fn) free_,
 };
 
-yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, const char *upstream_url) {
-     yacad_scm_git_t *result = malloc(sizeof(yacad_scm_git_t) + strlen(root_path) + strlen(upstream_url) + 2);
+yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, json_object_t *desc) {
+     size_t sz;
+     yacad_scm_git_t *result = NULL;
      git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
+     char *upstream_url = NULL;
+     size_t szurl = 0, szpath = strlen(root_path) + 1;
+     json_string_t *jurl;
+     yacad_conf_visitor_t *u = conf->visitor(conf, json_type_string, "upstream_url");
 
-     yacad_git_init();
+     u->visit(u, (json_value_t *)desc);
+     jurl = u->get_string(u);
+     if (jurl == NULL) {
+          conf->log(warn, "No upstream url\n");
+          goto error;
+     }
+     szurl = jurl->utf8(jurl, "", 0) + 1;
+     upstream_url = malloc(szurl);
+     jurl->utf8(jurl, upstream_url, szurl);
+
+     sz = sizeof(yacad_scm_git_t) + szpath + szurl;
+     result = malloc(sz);
 
      result->fn = git_fn;
      result->conf = conf;
-
      result->repo = NULL;
      result->remote = NULL;
+
+     yacad_git_init();
+
      if (gitcheck(conf, git_repository_open(&(result->repo), root_path), debug)) {
           if (gitcheck(conf, git_remote_load(&(result->remote), result->repo, REMOTE_NAME), debug)) {
                if (!gitcheck(conf, git_remote_delete(result->remote), warn)) {
-                    git_repository_free(result->repo);
-                    free(result);
-                    return NULL;
+                    goto error;
                }
                git_remote_free(result->remote);
           }
      } else {
           if (mkpath(root_path, 0700)) {
                conf->log(warn, "Could not create directory: %s\n", root_path);
-               free(result);
-               return NULL;
+               goto error;
           }
           if (!gitcheck(conf, git_repository_init(&(result->repo), root_path, false), warn)) {
-               free(result);
-               return NULL;
+               goto error;
           }
      }
      if (!gitcheck(conf, git_remote_create(&(result->remote), result->repo, REMOTE_NAME, upstream_url), warn)) {
-          git_repository_free(result->repo);
-          free(result);
-          return NULL;
+          goto error;
      }
 
      callbacks.sideband_progress = (git_transport_message_cb)yacad_git_sideband_progress;
@@ -173,16 +185,26 @@ yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, const 
      callbacks.credentials  = (git_cred_acquire_cb)yacad_git_credentials;
      callbacks.payload = result;
      if (!gitcheck(conf, git_remote_set_callbacks(result->remote, &callbacks), warn)) {
-          git_remote_free(result->remote);
-          git_repository_free(result->repo);
-          free(result);
-          return NULL;
+          goto error;
      }
 
      result->fetch_percent = result->index_percent = -1;
      result->root_path = result->data;
-     result->upstream_url = result->data + strlen(root_path) + 1;
-     strcpy(result->root_path, root_path);
-     strcpy(result->upstream_url, upstream_url);
+     result->upstream_url = result->data + szpath;
+     strncpy(result->root_path, root_path, szpath);
+     strncpy(result->upstream_url, upstream_url, szurl);
+
+ret:
+     free(upstream_url);
+     I(u)->free(I(u));
      return I(result);
+
+error:
+     if (result) {
+          git_remote_free(result->remote);
+          git_repository_free(result->repo);
+          free(result);
+          result = NULL;
+     }
+     goto ret;
 }

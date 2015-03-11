@@ -26,7 +26,6 @@
 #include <time.h>
 
 #include <cad_hash.h>
-#include <json.h>
 
 #include "yacad_conf.h"
 #include "yacad_project.h"
@@ -40,14 +39,6 @@ static const char *dirs[] = {
      NULL
 };
 
-typedef enum {
-     json_type_object,
-     json_type_array,
-     json_type_string,
-     json_type_number,
-     json_type_const,
-} json_type_t;
-
 typedef struct yacad_conf_impl_s {
      yacad_conf_t fn;
      const char *database_name;
@@ -57,7 +48,24 @@ typedef struct yacad_conf_impl_s {
      json_value_t *json;
      int generation;
      char *filename;
+     char *root_path;
 } yacad_conf_impl_t;
+
+typedef struct {
+     yacad_conf_visitor_t fn;
+     yacad_conf_impl_t *conf;
+     char *current_path;
+     json_type_t expected_type;
+     bool_t found;
+     union {
+          json_object_t *object;
+          json_array_t *array;
+          json_string_t *string;
+          json_number_t *number;
+          json_const_t *constant;
+     } value;
+     const char *pathformat;
+} yacad_conf_visitor_impl_t;
 
 static void taglog(level_t level) {
      struct timeval tm;
@@ -152,10 +160,13 @@ static int generation(yacad_conf_impl_t *this) {
      return this->generation;
 }
 
+static yacad_conf_visitor_impl_t *conf_visitor(yacad_conf_impl_t *this, json_type_t expected_type, const char *pathformat);
+
 static void free_(yacad_conf_impl_t *this) {
      if (this->json != NULL) {
           this->json->accept(this->json, json_kill());
      }
+     free(this->root_path);
      free(this->filename);
      free(this);
 }
@@ -276,6 +287,7 @@ static yacad_conf_t impl_fn =  {
      .get_projects = (yacad_conf_get_projects_fn)get_projects,
      .get_runners = (yacad_conf_get_runners_fn)get_runners,
      .generation = (yacad_conf_generation_fn)generation,
+     .visitor = (yacad_conf_visitor_fn)conf_visitor,
      .free = (yacad_conf_free_fn)free_,
 };
 
@@ -308,29 +320,33 @@ static void read_conf(yacad_conf_impl_t *this, const char *dir) {
      }
 }
 
-/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
-typedef struct {
-     json_visitor_t fn;
-     yacad_conf_impl_t *conf;
-     char *current_path;
-     json_type_t expected_type;
-     bool_t found;
-     union {
-          json_object_t *object;
-          json_array_t *array;
-          json_string_t *string;
-          json_number_t *number;
-          json_const_t *constant;
-     } value;
-     const char *pathformat;
-} conf_visitor_t;
+static json_object_t *get_object(yacad_conf_visitor_impl_t *this) {
+     return this->found ? this->value.object : NULL;
+}
 
-static void free_visitor(conf_visitor_t *this) {
+static json_array_t *get_array(yacad_conf_visitor_impl_t *this) {
+     return this->found ? this->value.array : NULL;
+}
+
+static json_string_t *get_string(yacad_conf_visitor_impl_t *this) {
+     return this->found ? this->value.string : NULL;
+}
+
+static json_number_t *get_number(yacad_conf_visitor_impl_t *this) {
+     return this->found ? this->value.number : NULL;
+}
+
+static json_const_t *get_const(yacad_conf_visitor_impl_t *this) {
+     return this->found ? this->value.constant : NULL;
+}
+
+static void free_visitor(yacad_conf_visitor_impl_t *this) {
      free(this);
 }
 
-static void visit_object(conf_visitor_t *this, json_object_t *visited) {
+static void visit_object(yacad_conf_visitor_impl_t *this, json_object_t *visited) {
      char *key = this->current_path;
      char *next_path;
      json_value_t *value;
@@ -343,12 +359,12 @@ static void visit_object(conf_visitor_t *this, json_object_t *visited) {
           *next_path = '\0';
           value = visited->get(visited, key);
           if (value != NULL) {
-               value->accept(value, I(this));
+               value->accept(value, I(I(this)));
           }
      }
 }
 
-static void visit_array(conf_visitor_t *this, json_array_t *visited) {
+static void visit_array(yacad_conf_visitor_impl_t *this, json_array_t *visited) {
      char *key = this->current_path;
      char *next_path;
      json_value_t *value;
@@ -363,83 +379,94 @@ static void visit_array(conf_visitor_t *this, json_array_t *visited) {
           index = atoi(key);
           value = visited->get(visited, index);
           if (value != NULL) {
-               value->accept(value, I(this));
+               value->accept(value, I(I(this)));
           }
      }
 }
 
-static void visit_string(conf_visitor_t *this, json_string_t *visited) {
+static void visit_string(yacad_conf_visitor_impl_t *this, json_string_t *visited) {
      this->value.string = visited;
      if (this->current_path[0] == '\0') {
           this->found = (this->expected_type == json_type_string);
      }
 }
 
-static void visit_number(conf_visitor_t *this, json_number_t *visited) {
+static void visit_number(yacad_conf_visitor_impl_t *this, json_number_t *visited) {
      this->value.number = visited;
      if (this->current_path[0] == '\0') {
           this->found = (this->expected_type == json_type_number);
      }
 }
 
-static void visit_const(conf_visitor_t *this, json_const_t *visited) {
+static void visit_const(yacad_conf_visitor_impl_t *this, json_const_t *visited) {
      this->value.constant = visited;
      if (this->current_path[0] == '\0') {
           this->found = (this->expected_type == json_type_const);
      }
 }
 
-static void vvisit(json_value_t *value, conf_visitor_t *v, va_list vargs) {
+static void vvisit(yacad_conf_visitor_impl_t *this, json_value_t *value, va_list vargs) {
      va_list args;
      int n;
      char *path;
 
      va_copy(args, vargs);
-     n = vsnprintf("", 0, v->pathformat, args) + 1;
+     n = vsnprintf("", 0, this->pathformat, args) + 1;
      va_end(args);
 
      path = malloc(n);
 
      va_copy(args, vargs);
-     vsnprintf(path, n, v->pathformat, args);
+     vsnprintf(path, n, this->pathformat, args);
      va_end(args);
 
-     v->current_path = path;
-     value->accept(value, I(v));
+     this->current_path = path;
+     value->accept(value, I(I(this)));
      free(path);
 }
 
-static void visit(json_value_t *value, conf_visitor_t *v, ...) {
+static void visit(yacad_conf_visitor_impl_t *this, json_value_t *value, ...) {
      va_list args;
-     va_start(args, v);
-     vvisit(value, v, args);
+     va_start(args, value);
+     vvisit(this, value, args);
      va_end(args);
 }
 
-static conf_visitor_t *conf_visitor(yacad_conf_impl_t *conf, json_type_t expected_type, const char *pathformat) {
-     static struct json_visitor visitor = {
+static yacad_conf_visitor_t conf_visitor_fn = {
+     .fn = {
           .free = (json_visit_free_fn)free_visitor,
           .visit_object = (json_visit_object_fn)visit_object,
           .visit_array = (json_visit_array_fn)visit_array,
           .visit_string = (json_visit_string_fn)visit_string,
           .visit_number = (json_visit_number_fn)visit_number,
           .visit_const = (json_visit_const_fn)visit_const,
-     };
-     conf_visitor_t *result = malloc(sizeof(conf_visitor_t));
-     result->fn = visitor;
-     result->conf = conf;
+     },
+     .get_object = (yacad_conf_visitor_get_object_fn)get_object,
+     .get_array = (yacad_conf_visitor_get_array_fn)get_array,
+     .get_string = (yacad_conf_visitor_get_string_fn)get_string,
+     .get_number = (yacad_conf_visitor_get_number_fn)get_number,
+     .get_const = (yacad_conf_visitor_get_const_fn)get_const,
+     .vvisit = (yacad_conf_visitor_vvisit_fn)vvisit,
+     .visit = (yacad_conf_visitor_visit_fn)visit,
+};
+
+static yacad_conf_visitor_impl_t *conf_visitor(yacad_conf_impl_t *this, json_type_t expected_type, const char *pathformat) {
+     yacad_conf_visitor_impl_t *result = malloc(sizeof(yacad_conf_visitor_impl_t));
+     result->fn = conf_visitor_fn;
+     result->conf = this;
      result->found = false;
      result->expected_type = expected_type;
      result->pathformat = pathformat;
+     result->value.object = NULL;
      return result;
 }
 
 static void set_logger(yacad_conf_impl_t *this) {
-     conf_visitor_t *v = conf_visitor(this, json_type_string, "debug/level");
+     yacad_conf_visitor_impl_t *v = conf_visitor(this, json_type_string, "logging/level");
      size_t i, n;
      char *level;
      json_string_t *jlevel;
-     visit(this->json, v);
+     visit(v, this->json);
      if (v->found) {
           jlevel = v->value.string;
           n = jlevel->count(jlevel) + 1;
@@ -457,16 +484,32 @@ static void set_logger(yacad_conf_impl_t *this) {
                fprintf(stderr, "**** Unknown level: '%s' (ignored)\n", level);
           }
      }
-     I(v)->free(I(v));
+     I(I(v))->free(I(I(v)));
 }
 
-static char *json_to_string(conf_visitor_t *v, json_value_t *value, ...) {
+static void set_root_path(yacad_conf_impl_t *this) {
+     yacad_conf_visitor_impl_t *v = conf_visitor(this, json_type_string, "core/root_path");
+     size_t n;
+     json_string_t *jlevel;
+     visit(v, this->json);
+     if (v->found) {
+          jlevel = v->value.string;
+          n = jlevel->count(jlevel) + 1;
+          this->root_path = malloc(n);
+          jlevel->utf8(jlevel, this->root_path, n);
+     } else {
+          this->root_path = strdup(".");
+     }
+     I(I(v))->free(I(I(v)));
+}
+
+static char *json_to_string(yacad_conf_visitor_impl_t *v, json_value_t *value, ...) {
      va_list args;
      size_t n;
      json_string_t *string;
      char *result = NULL;
      va_start(args, value);
-     vvisit(value, v, args);
+     vvisit(v, value, args);
      va_end(args);
      if (v->found) {
           string = v->value.string;
@@ -478,42 +521,81 @@ static char *json_to_string(conf_visitor_t *v, json_value_t *value, ...) {
 }
 
 static void read_projects(yacad_conf_impl_t *this) {
-     conf_visitor_t *v = conf_visitor(this, json_type_array, "projects");
-     conf_visitor_t *p = conf_visitor(this, json_type_string, "%s");
+     yacad_conf_visitor_impl_t *v = conf_visitor(this, json_type_array, "projects");
+     yacad_conf_visitor_impl_t *p;
+     yacad_conf_visitor_impl_t *s;
      json_array_t *projects;
      json_value_t *value;
      yacad_project_t *project;
-     char *name, *scm, *root_path, *upstream_url, *cron;
+     json_object_t *jscm;
+     char *name, *root_path, *crondesc;
+     yacad_scm_t *scm = NULL;
+     yacad_cron_t *cron = NULL;
      int i, n;
-     visit(this->json, v);
+     visit(v, this->json);
      if (v->found) {
           projects = v->value.array;
           n = projects->count(projects);
+          p = conf_visitor(this, json_type_string, "%s");
+          s = conf_visitor(this, json_type_object, "%s");
           for (i = 0; i < n; i++) {
                value = projects->get(projects, i);
                name = json_to_string(p, value, "name");
-               scm = json_to_string(p, value, "scm");
-               root_path = json_to_string(p, value, "root_path");
-               upstream_url = json_to_string(p, value, "upstream_url");
-               cron = json_to_string(p, value, "cron");
-               if (this->projects->get(this->projects, name) == NULL) {
-                    I(this)->log(info, "Adding project: %s [%s]\n", name, cron);
-                    project = yacad_project_new(I(this), name,
-                                                yacad_scm_new(I(this), scm, root_path, upstream_url),
-                                                yacad_cron_parse(I(this), cron));
-                    this->projects->set(this->projects, name, project);
+               if (name == NULL) {
+                    I(this)->log(warn, "Project without name!\n");
+               } else if (this->projects->get(this->projects, name) != NULL) {
+                    I(this)->log(warn, "Duplicate project name: \"%s\"\n", name);
                } else {
-                    I(this)->log(warn, "**** Duplicate project name: %s\n", name);
+                    scm = NULL;
+                    cron = NULL;
+                    root_path = NULL;
+
+                    // Prepare scm
+                    visit(s, value, "scm");
+                    jscm = s->value.object;
+                    if (jscm != NULL) {
+                         scm = yacad_scm_new(I(this), jscm, root_path);
+                    }
+
+                    // Prepare cron
+                    crondesc = json_to_string(p, value, "cron");
+                    if (crondesc == NULL) {
+                         crondesc = strdup("* * * * *");
+                    }
+                    cron = yacad_cron_parse(I(this), crondesc);
+
+                    if (scm == NULL) {
+                         I(this)->log(warn, "Project \"%s\": undefined scm\n", name);
+                         free(cron);
+                         scm->free(scm);
+                    } else if (cron == NULL) {
+                         I(this)->log(warn, "Project \"%s\": invalid cron\n", name);
+                         free(cron);
+                         scm->free(scm);
+                    } else {
+                         // Prepare root_path
+                         n = snprintf("", 0, "%s/%s", this->root_path, name) + 1;
+                         root_path = malloc(n);
+                         snprintf(root_path, n, "%s/%s", this->root_path, name);
+
+                         project = yacad_project_new(I(this), name, scm, cron);
+                         if (project == NULL) {
+                              free(cron);
+                              scm->free(scm);
+                         } else {
+                              I(this)->log(info, "Adding project: %s [%s]\n", name, crondesc);
+                              this->projects->set(this->projects, name, project);
+                         }
+                    }
+
+                    free(root_path);
                }
                free(name);
-               free(scm);
-               free(root_path);
-               free(upstream_url);
-               free(cron);
           }
+          I(I(s))->free(I(I(s)));
+          I(I(p))->free(I(I(p)));
      }
-     I(p)->free(I(p));
-     I(v)->free(I(v));
+     I(I(v))->free(I(I(v)));
 }
 
 yacad_conf_t *yacad_conf_new(void) {
@@ -528,7 +610,7 @@ yacad_conf_t *yacad_conf_new(void) {
      result->action_script = "yacad_scheduler.sh";
      result->projects = cad_new_hash(stdlib_memory, cad_hash_strings);
      result->runners = cad_new_hash(stdlib_memory, cad_hash_strings);
-     result->filename = NULL;
+     result->filename = result->root_path = NULL;
      result->json = NULL;
      result->generation = 0;
 
@@ -539,6 +621,8 @@ yacad_conf_t *yacad_conf_new(void) {
           if (result->json != NULL) {
                set_logger(result);
                I(result)->log(info, "Read configuration from %s\n", result->filename);
+               set_root_path(result);
+               I(result)->log(info, "Projects root path is %s\n", result->root_path);
                read_projects(result);
           }
           ref = result;
