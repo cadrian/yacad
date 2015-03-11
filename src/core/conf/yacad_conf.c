@@ -16,8 +16,8 @@
 
 #include "yacad_conf.h"
 #include "core/project/yacad_project.h"
-#include "cron/yacad_cron.h"
-#include "json/yacad_json_visitor.h"
+#include "common/cron/yacad_cron.h"
+#include "common/json/yacad_json_visitor.h"
 
 static const char *dirs[] = {
      "/etc/xdg/yacad",

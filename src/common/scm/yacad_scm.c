@@ -16,7 +16,7 @@
 
 #include "yacad_scm.h"
 #include "yacad_scm_git.h"
-#include "json/yacad_json_visitor.h"
+#include "common/json/yacad_json_visitor.h"
 
 yacad_scm_t *yacad_scm_new(logger_t log, json_object_t *desc, const char *root_path) {
      yacad_scm_t *result = NULL;

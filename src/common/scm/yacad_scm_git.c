@@ -17,7 +17,7 @@
 #include <git2.h>
 
 #include "yacad_scm_git.h"
-#include "json/yacad_json_visitor.h"
+#include "common/json/yacad_json_visitor.h"
 
 #define REMOTE_NAME "yacad_upstream"
 

@@ -18,7 +18,7 @@
 #define __YACAD_CONF_H__
 
 #include "yacad.h"
-#include "tasklist/yacad_task.h"
+#include "common/tasklist/yacad_task.h"
 
 typedef struct yacad_conf_s yacad_conf_t;
 

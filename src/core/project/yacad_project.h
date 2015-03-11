@@ -20,8 +20,8 @@
 #include <json.h>
 
 #include "yacad.h"
-#include "cron/yacad_cron.h"
-#include "scm/yacad_scm.h"
+#include "common/cron/yacad_cron.h"
+#include "common/scm/yacad_scm.h"
 
 typedef struct yacad_project_s yacad_project_t;
 

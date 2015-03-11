@@ -19,7 +19,7 @@
 
 #include "yacad.h"
 #include "core/conf/yacad_conf.h"
-#include "tasklist/yacad_task.h"
+#include "common/tasklist/yacad_task.h"
 
 typedef struct yacad_event_s yacad_event_t;
 

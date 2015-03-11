@@ -1,7 +1,8 @@
 #!/usr/bin/make -f
 
 PROJECT=yacad
-OBJ=$(shell find src -name '*.c' -a ! -name '_*' | sed -r 's|^src/|target/out/|g;s|\.c|.o|g')
+COMMON_OBJ=$(shell { find src/common -name '*.c'; ls src/*.c; } | sed -r 's|^src/|target/out/|g;s|\.c|.o|g')
+CORE_OBJ=$(shell find src/core -name '*.c' | sed -r 's|^src/|target/out/|g;s|\.c|.o|g')
 
 ifeq "$(wildcard ../libcad)" ""
 LIBCAD=
@@ -49,9 +50,9 @@ clean: $(LIBCADCLEAN) $(LIBYACJPCLEAN)
 
 exe: target/$(PROJECT)_core
 
-target/$(PROJECT)_core: $(OBJ) $(LIBCAD) $(LIBYACJP)
+target/$(PROJECT)_core: $(COMMON_OBJ) $(CORE_OBJ) $(LIBCAD) $(LIBYACJP)
 	@echo "Compiling executable: $@"
-	$(CC) $(CFLAGS) -o $@ $(OBJ) -Wall -Werror -L target -lcad -lyacjp -lm -lgit2
+	$(CC) $(CFLAGS) -o $@ $(COMMON_OBJ) $(CORE_OBJ) -Wall -Werror -L target -lcad -lyacjp -lm -lgit2
 
 target/out/%.o: src/%.c src/*.h Makefile
 	mkdir -p $(shell dirname $@)
