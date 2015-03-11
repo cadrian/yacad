@@ -14,14 +14,11 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <string.h>
-#include <time.h>
-
 #include "yacad_project.h"
 
 typedef struct yacad_project_impl_s {
      yacad_project_t fn;
-     yacad_conf_t *conf;
+     logger_t log;
      yacad_scm_t *scm;
      yacad_cron_t *cron;
      json_object_t *runner_criteria;
@@ -35,8 +32,8 @@ static const char *get_name(yacad_project_impl_t *this) {
 static struct timeval next_check(yacad_project_impl_t *this) {
      struct timeval result = this->cron->next(this->cron);
      char tmbuf[20];
-     if (this->conf->log(debug, "Project \"%s\" next check time: ", this->name) > 0) {
-          this->conf->log(debug, "%s\n", datetime(result.tv_sec, tmbuf));
+     if (this->log(debug, "Project \"%s\" next check time: ", this->name) > 0) {
+          this->log(debug, "%s\n", datetime(result.tv_sec, tmbuf));
      }
      return result;
 }
@@ -63,10 +60,10 @@ static yacad_project_t impl_fn = {
      .free = (yacad_project_free_fn) free_,
 };
 
-yacad_project_t *yacad_project_new(yacad_conf_t *conf, const char *name, yacad_scm_t *scm, yacad_cron_t *cron, json_object_t *runner_criteria) {
+yacad_project_t *yacad_project_new(logger_t log, const char *name, yacad_scm_t *scm, yacad_cron_t *cron, json_object_t *runner_criteria) {
      yacad_project_impl_t *result = malloc(sizeof(yacad_project_impl_t) + strlen(name) + 1);
      result->fn = impl_fn;
-     result->conf = conf;
+     result->log = log;
      strcpy(result->name, name);
      result->scm = scm;
      result->cron = cron;

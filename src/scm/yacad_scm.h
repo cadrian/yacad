@@ -17,10 +17,7 @@
 #ifndef __YACAD_SCM_H__
 #define __YACAD_SCM_H__
 
-#include <json.h>
-
 #include "yacad.h"
-#include "conf/yacad_conf.h"
 
 typedef struct yacad_scm_s yacad_scm_t;
 
@@ -32,6 +29,6 @@ struct yacad_scm_s {
      yacad_scm_free_fn free;
 };
 
-yacad_scm_t *yacad_scm_new(yacad_conf_t *conf, json_object_t *desc, const char *root_path);
+yacad_scm_t *yacad_scm_new(logger_t log, json_object_t *desc, const char *root_path);
 
 #endif /* __YACAD_SCM_H__ */

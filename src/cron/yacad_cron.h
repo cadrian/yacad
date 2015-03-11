@@ -17,9 +17,7 @@
 #ifndef __YACAD_CRON_H__
 #define __YACAD_CRON_H__
 
-#include <sys/time.h>
-
-#include "conf/yacad_conf.h"
+#include "yacad.h"
 
 typedef struct yacad_cron_s yacad_cron_t;
 
@@ -31,6 +29,6 @@ struct yacad_cron_s {
      yacad_cron_free_fn free;
 };
 
-yacad_cron_t *yacad_cron_parse(yacad_conf_t *conf, const char *cronspec);
+yacad_cron_t *yacad_cron_parse(logger_t log, const char *cronspec);
 
 #endif /* __YACAD_CRON_H__ */

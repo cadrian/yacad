@@ -14,16 +14,10 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
-#include <unistd.h>
-#include <time.h>
-
-#include <cad_event_queue.h>
-
 #include "yacad_scheduler.h"
 #include "yacad_event.h"
+#include "core/project/yacad_project.h"
 #include "tasklist/yacad_tasklist.h"
-#include "project/yacad_project.h"
 
 typedef enum {
      state_init = 0, state_running, state_stopping, state_stopped
@@ -219,7 +213,7 @@ yacad_scheduler_t *yacad_scheduler_new(yacad_conf_t *conf) {
      result->next_check.state = check_state_ready;
      result->next_check.confgen = -1;
      result->state = state_init;
-     result->tasklist = yacad_tasklist_new(conf);
+     result->tasklist = yacad_tasklist_new(conf->log);
      result->event_queue = cad_new_event_queue_pthread(stdlib_memory, (provide_data_fn)event_provider, 16);
      result->state = state_running;
      result->event_queue->start(result->event_queue, result);

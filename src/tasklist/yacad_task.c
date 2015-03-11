@@ -14,10 +14,6 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "yacad_task.h"
 
 typedef struct yacad_task_impl_s {

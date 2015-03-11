@@ -14,16 +14,16 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <string.h>
 #include <git2.h>
 
 #include "yacad_scm_git.h"
+#include "json/yacad_json_visitor.h"
 
 #define REMOTE_NAME "yacad_upstream"
 
 typedef struct yacad_scm_git_s {
      yacad_scm_t fn;
-     yacad_conf_t *conf;
+     logger_t log;
      git_repository *repo;
      git_remote *remote;
      int fetch_percent;
@@ -57,46 +57,46 @@ static void yacad_git_shutdown(void) {
 #endif
 }
 
-static bool_t __gitcheck(yacad_conf_t *conf, int giterr, level_t level, const char *gitaction, unsigned int line) {
+static bool_t __gitcheck(logger_t log, int giterr, level_t level, const char *gitaction, unsigned int line) {
      int result = true;
      const git_error *e;
      char *paren;
      int len;
      if (giterr != 0) {
-          conf->log(debug, "Error line %u: %s\n", line, gitaction);
+          log(debug, "Error line %u: %s\n", line, gitaction);
           paren = strchrnul(gitaction, '(');
           len = paren - gitaction;
           e = giterr_last();
           if (e == NULL) {
-               conf->log(level, "%.*s: error %d\n", len, gitaction, giterr);
+               log(level, "%.*s: error %d\n", len, gitaction, giterr);
           } else {
-               conf->log(level, "%.*s: error %d/%d: %s\n", len, gitaction, giterr, e->klass, e->message);
+               log(level, "%.*s: error %d/%d: %s\n", len, gitaction, giterr, e->klass, e->message);
           }
           result = false;
      }
      return result;
 }
 
-#define gitcheck(conf, gitaction, level) __gitcheck(conf, (gitaction), (level), #gitaction, __LINE__)
+#define gitcheck(log, gitaction, level) __gitcheck(log, (gitaction), (level), #gitaction, __LINE__)
 
 static bool_t check(yacad_scm_git_t *this) {
      bool_t result = false, downloaded;
 
-     if (!gitcheck(this->conf, git_remote_connect(this->remote, GIT_DIRECTION_FETCH), warn)) {
+     if (!gitcheck(this->log, git_remote_connect(this->remote, GIT_DIRECTION_FETCH), warn)) {
           // Could not connect to remote
      } else {
           this->fetch_percent = this->index_percent = -1;
-          downloaded = gitcheck(this->conf, git_remote_download(this->remote), warn);
+          downloaded = gitcheck(this->log, git_remote_download(this->remote), warn);
           git_remote_disconnect(this->remote);
           if (downloaded) {
-               if (!gitcheck(this->conf, git_remote_update_tips(this->remote, NULL, NULL), warn)) {
+               if (!gitcheck(this->log, git_remote_update_tips(this->remote, NULL, NULL), warn)) {
                     // Could not update tips
                } else if (this->fetch_percent == -1 && this->index_percent == -1) {
-                    this->conf->log(debug, "Remote is up-to-date: %s\n", this->upstream_url);
+                    this->log(debug, "Remote is up-to-date: %s\n", this->upstream_url);
                } else if (this->fetch_percent != 100 || this->index_percent != 100) {
-                    this->conf->log(warn, "Download incomplete: network %3d%%  /  indexing %3d%%\n", this->fetch_percent, this->index_percent);
+                    this->log(warn, "Download incomplete: network %3d%%  /  indexing %3d%%\n", this->fetch_percent, this->index_percent);
                } else {
-                    this->conf->log(info, "Remote needs building: %s\n", this->upstream_url);
+                    this->log(info, "Remote needs building: %s\n", this->upstream_url);
                     result = true;
                }
           }
@@ -113,7 +113,7 @@ static void free_(yacad_scm_git_t *this) {
 }
 
 static int yacad_git_sideband_progress(const char *str, int len, yacad_scm_git_t *this) {
-     this->conf->log(debug, "%.*s\n", len, str);
+     this->log(debug, "%.*s\n", len, str);
      return 0;
 }
 
@@ -123,9 +123,9 @@ static int yacad_git_transfer_progress(const git_transfer_progress *stats, yacad
     int kbytes = stats->received_bytes / 1024;
 
     if (fetch_percent != this->fetch_percent || index_percent != this->index_percent) {
-         this->conf->log(debug, "Transfer: network %3d%% (%4d Kib, %5d/%5d)  /  indexing %3d%% (%5d/%5d)\n",
-                         fetch_percent, kbytes, stats->received_objects, stats->total_objects,
-                         index_percent, stats->indexed_objects, stats->total_objects);
+         this->log(debug, "Transfer: network %3d%% (%4d Kib, %5d/%5d)  /  indexing %3d%% (%5d/%5d)\n",
+                   fetch_percent, kbytes, stats->received_objects, stats->total_objects,
+                   index_percent, stats->indexed_objects, stats->total_objects);
          this->fetch_percent = fetch_percent;
          this->index_percent = index_percent;
     }
@@ -134,7 +134,7 @@ static int yacad_git_transfer_progress(const git_transfer_progress *stats, yacad
 
 static int yacad_git_credentials(git_cred **out, const char *url, const char *username_from_url, unsigned int allowed_types, yacad_scm_git_t *this) {
      // TODO one of git_cred_ssh_key_from_agent, git_cred_ssh_key_new, git_cred_userpass_plaintext_new, or git_cred_default_new
-     this->conf->log(debug, "calling default cred\n");
+     this->log(debug, "calling default cred\n");
      return git_cred_default_new(out) || git_cred_ssh_key_from_agent(out, username_from_url);
 }
 
@@ -143,19 +143,19 @@ static yacad_scm_t git_fn = {
      (yacad_scm_free_fn) free_,
 };
 
-yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, json_object_t *desc) {
+yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_object_t *desc) {
      size_t sz;
      yacad_scm_git_t *result = NULL;
      git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
      char *upstream_url = NULL;
      size_t szurl = 0, szpath = strlen(root_path) + 5;
      json_string_t *jurl;
-     yacad_conf_visitor_t *u = conf->visitor(conf, json_type_string, "upstream_url");
+     yacad_json_visitor_t *u = yacad_json_visitor_new(log, json_type_string, "upstream_url");
 
      u->visit(u, (json_value_t *)desc);
      jurl = u->get_string(u);
      if (jurl == NULL) {
-          conf->log(warn, "No upstream url\n");
+          log(warn, "No upstream url\n");
           goto error;
      }
      szurl = jurl->utf8(jurl, "", 0) + 1;
@@ -166,7 +166,7 @@ yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, json_o
      result = malloc(sz);
 
      result->fn = git_fn;
-     result->conf = conf;
+     result->log = log;
      result->repo = NULL;
      result->remote = NULL;
 
@@ -178,19 +178,19 @@ yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, json_o
 
      yacad_git_init();
 
-     if (gitcheck(conf, git_repository_open_bare(&(result->repo), result->root_path), debug)) {
-          if (gitcheck(conf, git_remote_load(&(result->remote), result->repo, REMOTE_NAME), debug)) {
-               if (!gitcheck(conf, git_remote_delete(result->remote), warn)) {
+     if (gitcheck(log, git_repository_open_bare(&(result->repo), result->root_path), debug)) {
+          if (gitcheck(log, git_remote_load(&(result->remote), result->repo, REMOTE_NAME), debug)) {
+               if (!gitcheck(log, git_remote_delete(result->remote), warn)) {
                     goto error;
                }
                git_remote_free(result->remote);
           }
      } else {
-          if (!gitcheck(conf, git_repository_init(&(result->repo), result->root_path, true), warn)) {
+          if (!gitcheck(log, git_repository_init(&(result->repo), result->root_path, true), warn)) {
                goto error;
           }
      }
-     if (!gitcheck(conf, git_remote_create(&(result->remote), result->repo, REMOTE_NAME, upstream_url), warn)) {
+     if (!gitcheck(log, git_remote_create(&(result->remote), result->repo, REMOTE_NAME, upstream_url), warn)) {
           goto error;
      }
 
@@ -198,7 +198,7 @@ yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, json_o
      callbacks.transfer_progress = (git_transfer_progress_cb)yacad_git_transfer_progress;
      callbacks.credentials  = (git_cred_acquire_cb)yacad_git_credentials;
      callbacks.payload = result;
-     if (!gitcheck(conf, git_remote_set_callbacks(result->remote, &callbacks), warn)) {
+     if (!gitcheck(log, git_remote_set_callbacks(result->remote, &callbacks), warn)) {
           goto error;
      }
 

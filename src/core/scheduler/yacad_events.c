@@ -14,12 +14,6 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
-
-#include <cad_array.h>
-#include <cad_hash.h>
-#include <cad_events.h>
-
 #include "yacad_events.h"
 
 typedef struct yacad_events_impl_s {

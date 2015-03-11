@@ -14,17 +14,11 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
-#include <string.h>
-
-#include <cad_array.h>
-#include <cad_hash.h>
-
 #include "yacad_tasklist.h"
 
 typedef struct yacad_tasklist_impl_s {
      yacad_tasklist_t fn;
-     yacad_conf_t *conf;
+     logger_t log;
      cad_hash_t *tasklist_per_runner;
 } yacad_tasklist_impl_t;
 
@@ -54,11 +48,11 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
           found = same_task(task, *(yacad_task_t**)tasklist->get(tasklist, i));
      }
      if (found) {
-          this->conf->log(debug, "task not added: %s\n", task->serialize(task));
+          this->log(debug, "task not added: %s\n", task->serialize(task));
           task->free(task);
      } else {
           tasklist->insert(tasklist, n, &task);
-          this->conf->log(info, "added task: %s\n", task->serialize(task));
+          this->log(info, "added task: %s\n", task->serialize(task));
           // TODO if task.id == 0??
           // TODO save to database
      }
@@ -98,10 +92,10 @@ static yacad_tasklist_t impl_fn = {
      .free = (yacad_tasklist_free_fn)free_,
 };
 
-yacad_tasklist_t *yacad_tasklist_new(yacad_conf_t *conf) {
+yacad_tasklist_t *yacad_tasklist_new(logger_t log) {
      yacad_tasklist_impl_t *result = malloc(sizeof(yacad_tasklist_impl_t));
      result->fn = impl_fn;
-     result->conf = conf;
+     result->log = log;
      result->tasklist_per_runner = cad_new_hash(stdlib_memory, cad_hash_strings);
      // TODO read from database
      return I(result);

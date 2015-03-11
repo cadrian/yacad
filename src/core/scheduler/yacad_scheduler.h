@@ -18,7 +18,7 @@
 #define __YACAD_SCHEDULER_H__
 
 #include "yacad.h"
-#include "conf/yacad_conf.h"
+#include "core/conf/yacad_conf.h"
 #include "yacad_events.h"
 
 typedef struct yacad_scheduler_s yacad_scheduler_t;

@@ -18,7 +18,7 @@
 #define __YACAD_EVENT_H__
 
 #include "yacad.h"
-#include "conf/yacad_conf.h"
+#include "core/conf/yacad_conf.h"
 #include "tasklist/yacad_task.h"
 
 typedef struct yacad_event_s yacad_event_t;

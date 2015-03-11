@@ -17,12 +17,9 @@
 #ifndef __YACAD_PROJECT_H__
 #define __YACAD_PROJECT_H__
 
-#include <sys/time.h>
-
 #include <json.h>
 
 #include "yacad.h"
-#include "conf/yacad_conf.h"
 #include "cron/yacad_cron.h"
 #include "scm/yacad_scm.h"
 
@@ -42,6 +39,6 @@ struct yacad_project_s {
      yacad_project_free_fn free;
 };
 
-yacad_project_t *yacad_project_new(yacad_conf_t *conf, const char *name, yacad_scm_t *scm, yacad_cron_t *cron, json_object_t *runner_criteria);
+yacad_project_t *yacad_project_new(logger_t log, const char *name, yacad_scm_t *scm, yacad_cron_t *cron, json_object_t *runner_criteria);
 
 #endif /* __YACAD_PROJECT_H__ */

@@ -14,8 +14,6 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-
 #include "yacad_event.h"
 
 typedef struct yacad_event_impl_s {

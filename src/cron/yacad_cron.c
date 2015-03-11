@@ -14,10 +14,6 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-#include <time.h>
-
-#include "yacad.h"
 #include "yacad_cron.h"
 
 typedef struct {
@@ -30,7 +26,7 @@ typedef struct {
 
 typedef struct yacad_cron_impl_s {
      yacad_cron_t fn;
-     yacad_conf_t *conf;
+     logger_t log;
      cronspec_t spec;
 } yacad_cron_impl_t;
 
@@ -42,12 +38,12 @@ static bool_t lookup(yacad_cron_impl_t *this, unsigned long field, int *min, int
      int i;
      bool_t result = false, done = false;
      if (ISBIT(field, *min)) {
-          this->conf->log(trace, "lookup %s: found min %2d\n", fieldname, *min);
+          this->log(trace, "lookup %s: found min %2d\n", fieldname, *min);
           result = done = true;
      }
      for (i = *min + 1; !done && i < max; i++) {
           if (ISBIT(field, i)) {
-               this->conf->log(trace, "lookup %s: found %2d\n", fieldname, i);
+               this->log(trace, "lookup %s: found %2d\n", fieldname, i);
                *min = i;
                done = true;
           }
@@ -207,12 +203,12 @@ static yacad_cron_t impl_fn = {
      .free = (yacad_cron_free_fn)free_,
 };
 
-yacad_cron_t *yacad_cron_parse(yacad_conf_t *conf, const char *cronspec) {
+yacad_cron_t *yacad_cron_parse(logger_t log, const char *cronspec) {
      yacad_cron_impl_t *result = malloc(sizeof(yacad_cron_impl_t));
      int offset = 0;
 
      result->fn = impl_fn;
-     result->conf = conf;
+     result->log = log;
 
      skip_blanks(cronspec, &offset);
      result->spec.min = parse_field(cronspec, &offset, 60);

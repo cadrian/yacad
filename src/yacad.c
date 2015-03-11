@@ -14,16 +14,96 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <libgen.h>
-#include <sys/stat.h>
-
 #include "yacad.h"
 
 #define DATETIME_FORMAT "%Y-%m-%d %H:%M:%S"
+
+static void taglog(level_t level) {
+     struct timeval tm;
+     char buffer[20];
+     static char *tag[] = {
+          "WARN ",
+          "INFO ",
+          "DEBUG",
+          "TRACE",
+     };
+     gettimeofday(&tm, NULL);
+     fprintf(stderr, "%s.%06ld [%s] ", datetime(tm.tv_sec, buffer), tm.tv_usec, tag[level]);
+}
+
+static int warn_logger(level_t level, char *format, ...) {
+     static bool_t nl = true;
+     int result = 0;
+     va_list arg;
+     if(level <= warn) {
+          va_start(arg, format);
+          if (nl) {
+               taglog(level);
+          }
+          result = vfprintf(stderr, format, arg);
+          va_end(arg);
+          nl = format[strlen(format)-1] == '\n';
+     }
+     return result;
+}
+
+static int info_logger(level_t level, char *format, ...) {
+     static bool_t nl = true;
+     int result = 0;
+     va_list arg;
+     if(level <= info) {
+          va_start(arg, format);
+          if (nl) {
+               taglog(level);
+          }
+          result = vfprintf(stderr, format, arg);
+          va_end(arg);
+          nl = format[strlen(format)-1] == '\n';
+     }
+     return result;
+}
+
+static int debug_logger(level_t level, char *format, ...) {
+     static bool_t nl = true;
+     int result = 0;
+     va_list arg;
+     if(level <= debug) {
+          va_start(arg, format);
+          if (nl) {
+               taglog(level);
+          }
+          result = vfprintf(stderr, format, arg);
+          va_end(arg);
+          nl = format[strlen(format)-1] == '\n';
+     }
+     return result;
+}
+
+static int trace_logger(level_t level, char *format, ...) {
+     static bool_t nl = true;
+     int result = 0;
+     va_list arg;
+     if(level <= trace) {
+          va_start(arg, format);
+          if (nl) {
+               taglog(level);
+          }
+          result = vfprintf(stderr, format, arg);
+          va_end(arg);
+          nl = format[strlen(format)-1] == '\n';
+     }
+     return result;
+}
+
+logger_t get_logger(level_t level) {
+     switch(level) {
+     case warn:  return warn_logger;
+     case info:  return info_logger;
+     case debug: return debug_logger;
+     case trace: return trace_logger;
+     }
+     return NULL;
+}
 
 const char *datetime(time_t t, char *tmbuf) {
      char *result = NULL;
