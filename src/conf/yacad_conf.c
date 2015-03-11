@@ -28,8 +28,8 @@
 #include <cad_hash.h>
 
 #include "yacad_conf.h"
-#include "yacad_project.h"
-#include "yacad_cron.h"
+#include "project/yacad_project.h"
+#include "cron/yacad_cron.h"
 
 static const char *dirs[] = {
      "/etc/xdg/yacad",

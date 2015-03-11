@@ -20,7 +20,7 @@
 #include <json.h>
 
 #include "yacad.h"
-#include "yacad_conf.h"
+#include "conf/yacad_conf.h"
 
 typedef struct yacad_scm_s yacad_scm_t;
 

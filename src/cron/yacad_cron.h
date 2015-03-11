@@ -19,7 +19,7 @@
 
 #include <sys/time.h>
 
-#include "yacad_conf.h"
+#include "conf/yacad_conf.h"
 
 typedef struct yacad_cron_s yacad_cron_t;
 

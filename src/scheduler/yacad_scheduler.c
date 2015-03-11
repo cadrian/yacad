@@ -23,7 +23,7 @@
 #include "yacad_scheduler.h"
 #include "yacad_event.h"
 #include "tasklist/yacad_tasklist.h"
-#include "conf/yacad_project.h"
+#include "project/yacad_project.h"
 
 typedef enum {
      state_init = 0, state_running, state_stopping, state_stopped

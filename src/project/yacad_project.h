@@ -20,9 +20,9 @@
 #include <sys/time.h>
 
 #include "yacad.h"
-#include "yacad_conf.h"
-#include "yacad_cron.h"
-#include "yacad_scm.h"
+#include "conf/yacad_conf.h"
+#include "cron/yacad_cron.h"
+#include "scm/yacad_scm.h"
 
 typedef struct yacad_project_s yacad_project_t;
 
