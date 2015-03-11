@@ -521,81 +521,83 @@ static char *json_to_string(yacad_conf_visitor_impl_t *v, json_value_t *value, .
 }
 
 static void read_projects(yacad_conf_impl_t *this) {
-     yacad_conf_visitor_impl_t *v = conf_visitor(this, json_type_array, "projects");
-     yacad_conf_visitor_impl_t *p;
-     yacad_conf_visitor_impl_t *s;
-     json_array_t *projects;
-     json_value_t *value;
+     yacad_conf_visitor_impl_t *vprojects = conf_visitor(this, json_type_array, "projects");
+     yacad_conf_visitor_impl_t *vproject;
+     yacad_conf_visitor_impl_t *vscm;
+     json_value_t *jproject;
+     json_array_t *jprojects;
      yacad_project_t *project;
      json_object_t *jscm;
      char *name, *root_path, *crondesc;
      yacad_scm_t *scm = NULL;
      yacad_cron_t *cron = NULL;
-     int i, n;
-     visit(v, this->json);
-     if (v->found) {
-          projects = v->value.array;
-          n = projects->count(projects);
-          p = conf_visitor(this, json_type_string, "%s");
-          s = conf_visitor(this, json_type_object, "%s");
-          for (i = 0; i < n; i++) {
-               value = projects->get(projects, i);
-               name = json_to_string(p, value, "name");
-               if (name == NULL) {
-                    I(this)->log(warn, "Project without name!\n");
-               } else if (this->projects->get(this->projects, name) != NULL) {
-                    I(this)->log(warn, "Duplicate project name: \"%s\"\n", name);
-               } else {
-                    scm = NULL;
-                    cron = NULL;
-                    root_path = NULL;
-
-                    // Prepare root_path
-                    n = snprintf("", 0, "%s/%s", this->root_path, name) + 1;
-                    root_path = malloc(n);
-                    snprintf(root_path, n, "%s/%s", this->root_path, name);
-
-                    // Prepare scm
-                    visit(s, value, "scm");
-                    jscm = s->value.object;
-                    if (jscm != NULL) {
-                         scm = yacad_scm_new(I(this), jscm, root_path);
-                    }
-
-                    // Prepare cron
-                    crondesc = json_to_string(p, value, "cron");
-                    if (crondesc == NULL) {
-                         crondesc = strdup("* * * * *");
-                    }
-                    cron = yacad_cron_parse(I(this), crondesc);
-
-                    if (scm == NULL) {
-                         I(this)->log(warn, "Project \"%s\": undefined scm\n", name);
-                         free(cron);
-                         scm->free(scm);
-                    } else if (cron == NULL) {
-                         I(this)->log(warn, "Project \"%s\": invalid cron\n", name);
-                         free(cron);
-                         scm->free(scm);
+     int i, n, np;
+     visit(vprojects, this->json);
+     if (vprojects->found) {
+          jprojects = vprojects->value.array;
+          np = jprojects->count(jprojects);
+          if (np > 0) {
+               vproject = conf_visitor(this, json_type_string, "%s");
+               vscm = conf_visitor(this, json_type_object, "%s");
+               for (i = 0; i < np; i++) {
+                    jproject = jprojects->get(jprojects, i);
+                    name = json_to_string(vproject, jproject, "name");
+                    if (name == NULL) {
+                         I(this)->log(warn, "Project without name!\n");
+                    } else if (this->projects->get(this->projects, name) != NULL) {
+                         I(this)->log(warn, "Duplicate project name: \"%s\"\n", name);
                     } else {
-                         project = yacad_project_new(I(this), name, scm, cron);
-                         if (project == NULL) {
-                              free(cron);
+                         scm = NULL;
+                         cron = NULL;
+                         root_path = NULL;
+
+                         // Prepare root_path
+                         n = snprintf("", 0, "%s/%s", this->root_path, name) + 1;
+                         root_path = malloc(n);
+                         snprintf(root_path, n, "%s/%s", this->root_path, name);
+
+                         // Prepare scm
+                         visit(vscm, jproject, "scm");
+                         jscm = vscm->value.object;
+                         if (jscm != NULL) {
+                              scm = yacad_scm_new(I(this), jscm, root_path);
+                         }
+
+                         // Prepare cron
+                         crondesc = json_to_string(vproject, jproject, "cron");
+                         if (crondesc == NULL) {
+                              crondesc = strdup("* * * * *");
+                         }
+                         cron = yacad_cron_parse(I(this), crondesc);
+
+                         if (scm == NULL) {
+                              I(this)->log(warn, "Project \"%s\": undefined scm\n", name);
+                              if (cron != NULL) {
+                                   cron->free(cron);
+                              }
+                         } else if (cron == NULL) {
+                              I(this)->log(warn, "Project \"%s\": invalid cron\n", name);
                               scm->free(scm);
                          } else {
-                              I(this)->log(info, "Adding project: %s [%s]\n", name, crondesc);
-                              this->projects->set(this->projects, name, project);
+                              project = yacad_project_new(I(this), name, scm, cron);
+                              if (project == NULL) {
+                                   cron->free(cron);
+                                   scm->free(scm);
+                              } else {
+                                   I(this)->log(info, "Adding project: %s [%s]\n", name, crondesc);
+                                   this->projects->set(this->projects, name, project);
+                              }
                          }
-                    }
 
-                    free(root_path);
+                         free(root_path);
+                    }
+                    free(name);
                }
-               free(name);
+               I(I(vscm))->free(I(I(vscm)));
+               I(I(vproject))->free(I(I(vproject)));
           }
-          I(I(s))->free(I(I(s)));
-          I(I(p))->free(I(I(p)));
      }
-     I(I(v))->free(I(I(v)));
+     I(I(vprojects))->free(I(I(vprojects)));
 }
 
 yacad_conf_t *yacad_conf_new(void) {
