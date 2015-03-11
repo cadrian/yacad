@@ -19,12 +19,25 @@
 
 #include "yacad.h"
 
+/**
+ * The core-side representation of a runner. It manages its connexion
+ * to the remote runner (ping, load discovery, task and results
+ * transfer).
+ */
+
 typedef struct yacad_runner_s yacad_runner_t;
 
+typedef const char *(*yacad_runner_get_name_fn)(yacad_runner_t *this);
+typedef const char *(*yacad_runner_get_arch_fn)(yacad_runner_t *this);
+typedef const int(*yacad_runner_get_load_fn)(yacad_runner_t *this);
 typedef void (*yacad_runner_free_fn)(yacad_runner_t *this);
 
 struct yacad_runner_s {
+     yacad_runner_get_name_fn get_name;
      yacad_runner_free_fn free;
 };
+
+yacad_runner_t *yacad_runner_new(json_object_t *desc);
+yacad_runner_t *yacad_runner_select(const yacad_runner_t **runners, size_t szrunners, json_object_t *criteria);
 
 #endif /* __YACAD_RUNNER_H__ */

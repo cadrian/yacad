@@ -112,7 +112,7 @@ static void do_stop(yacad_event_t *event, yacad_scheduler_impl_t *this) {
      this->event_queue->synchronized(this->event_queue, (synchronized_data_fn)synchronized_do_stop, this);
 }
 
-static void iterate_next_check(cad_hash_t *tasklist_per_runner, int index, const char *key, yacad_project_t *project, yacad_scheduler_impl_t *this) {
+static void iterate_next_check(cad_hash_t *projects, int index, const char *key, yacad_project_t *project, yacad_scheduler_impl_t *this) {
      struct timeval tm = project->next_check(project);
      if (this->next_check.time.tv_sec == 0 || timercmp(&tm, &(this->next_check.time), <)) {
           this->next_check.time = tm;
@@ -132,13 +132,14 @@ static void next_check(yacad_scheduler_impl_t *this) {
      }
 }
 
-static void on_check_project(yacad_project_t *project, yacad_scheduler_impl_t *this) {
-     // TODO add task because the check succeeded
-     //this->tasklist->add(this->tasklist, task);
-}
-
-static void iterate_check_project(cad_hash_t *tasklist_per_runner, int index, const char *key, yacad_project_t *project, yacad_scheduler_impl_t *this) {
-     project->check(project, (on_success_action)on_check_project, this);
+static void iterate_check_project(cad_hash_t *projects, int index, const char *project_name, yacad_project_t *project, yacad_scheduler_impl_t *this) {
+     yacad_task_t *task;
+     const char *runner_name = "foo"; // TODO
+     const char *action = "dummy"; // TODO
+     if (project->check(project)) {
+          task = yacad_task_new(0, project_name, runner_name, action);
+          this->tasklist->add(this->tasklist, task);
+     }
 }
 
 static void synchronized_check_done(yacad_scheduler_impl_t *this) {

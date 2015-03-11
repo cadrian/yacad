@@ -4,18 +4,27 @@
     },
     "core": {
         "root_path": "#PATH#/test/projects",
+        "port": 9733,
     },
     "projects": [
         {
-                "name": "test",
-                "scm": {
-                    "type": "git",
-                    "upstream_url":
-                        // "http://github.com/cadrian/libcad.git",
-                        // "git://git@github.com/cadrian/libcad.git",
-                        "file://#PATH#/.git",
-                },
-                "cron": "* * * * *",
+            "name": "test",
+            "runner": {
+                "arch": "foo",
+            },
+            "scm": {
+                "type": "git",
+                "upstream_url": "file://#PATH#/.git",
+            },
+            "cron": "* * * * *",
         },
+    ],
+    "runners": [
+        {
+            "name": "test1",
+            "arch": "foo",
+            "host": "localhost",
+            "port": 9572,
+        }
     ],
 }

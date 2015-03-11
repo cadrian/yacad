@@ -527,8 +527,10 @@ static void read_projects(yacad_conf_impl_t *this) {
      yacad_conf_visitor_impl_t *vprojects = conf_visitor(this, json_type_array, "projects");
      yacad_conf_visitor_impl_t *vproject;
      yacad_conf_visitor_impl_t *vscm;
+     yacad_conf_visitor_impl_t *vrunner;
      json_value_t *jproject;
      json_array_t *jprojects;
+     json_object_t *jrunner;
      yacad_project_t *project;
      json_object_t *jscm;
      char *name, *root_path, *crondesc;
@@ -541,7 +543,8 @@ static void read_projects(yacad_conf_impl_t *this) {
           np = jprojects->count(jprojects);
           if (np > 0) {
                vproject = conf_visitor(this, json_type_string, "%s");
-               vscm = conf_visitor(this, json_type_object, "%s");
+               vscm = conf_visitor(this, json_type_object, "scm");
+               vrunner = conf_visitor(this, json_type_object, "runner");
                for (i = 0; i < np; i++) {
                     jproject = jprojects->get(jprojects, i);
                     name = json_to_string(vproject, jproject, "name");
@@ -553,6 +556,7 @@ static void read_projects(yacad_conf_impl_t *this) {
                          scm = NULL;
                          cron = NULL;
                          root_path = NULL;
+                         jrunner = NULL;
 
                          // Prepare root_path
                          n = snprintf("", 0, "%s/%s", this->root_path, name) + 1;
@@ -560,10 +564,12 @@ static void read_projects(yacad_conf_impl_t *this) {
                          snprintf(root_path, n, "%s/%s", this->root_path, name);
 
                          // Prepare scm
-                         visit(vscm, jproject, "scm");
-                         jscm = vscm->value.object;
-                         if (jscm != NULL) {
-                              scm = yacad_scm_new(I(this), jscm, root_path);
+                         visit(vscm, jproject);
+                         if (vscm->found) {
+                              jscm = vscm->value.object;
+                              if (jscm != NULL) {
+                                   scm = yacad_scm_new(I(this), jscm, root_path);
+                              }
                          }
 
                          // Prepare cron
@@ -572,6 +578,12 @@ static void read_projects(yacad_conf_impl_t *this) {
                               crondesc = strdup("* * * * *");
                          }
                          cron = yacad_cron_parse(I(this), crondesc);
+
+                         // Prepare jrunner
+                         visit(vrunner, jproject);
+                         if (vrunner->found) {
+                              jrunner = vrunner->value.object;
+                         }
 
                          if (scm == NULL) {
                               I(this)->log(warn, "Project \"%s\": undefined scm\n", name);
@@ -582,7 +594,7 @@ static void read_projects(yacad_conf_impl_t *this) {
                               I(this)->log(warn, "Project \"%s\": invalid cron\n", name);
                               scm->free(scm);
                          } else {
-                              project = yacad_project_new(I(this), name, scm, cron);
+                              project = yacad_project_new(I(this), name, scm, cron, jrunner);
                               if (project == NULL) {
                                    cron->free(cron);
                                    scm->free(scm);
@@ -596,6 +608,7 @@ static void read_projects(yacad_conf_impl_t *this) {
                     }
                     free(name);
                }
+               I(I(vrunner))->free(I(I(vrunner)));
                I(I(vscm))->free(I(I(vscm)));
                I(I(vproject))->free(I(I(vproject)));
           }
