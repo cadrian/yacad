@@ -12,7 +12,8 @@
                     "type": "git",
                     "upstream_url":
                         // "http://github.com/cadrian/libcad.git",
-                        "git://git@github.com/cadrian/libcad.git",
+                        // "git://git@github.com/cadrian/libcad.git",
+                        "file://#PATH#/.git",
                 },
                 "cron": "* * * * *",
         },
