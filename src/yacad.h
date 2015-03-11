@@ -20,6 +20,13 @@
 #include <time.h>
 #include <sys/types.h>
 
+/* http://semver.org/ */
+#define YACAD_VER_MAJOR 0
+#define YACAD_VER_MINOR 0
+#define YACAD_VER_PATCH 1
+#define YACAD_VER_PRERELEASE ""
+#define YACAD_VER_METADATA ""
+
 #define I(impl) (&((impl)->fn))
 
 typedef enum {
@@ -29,6 +36,7 @@ typedef enum {
 
 #define bool2str(flag) ((flag) ? "true" : "false")
 
+const char *yacad_version(void);
 const char *datetime(time_t t, char *tmbuf);
 int mkpath(const char *dir, mode_t mode);
 

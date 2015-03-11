@@ -14,6 +14,8 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
 #include <string.h>
 #include <libgen.h>
@@ -46,4 +48,21 @@ int mkpath(const char *dir, mode_t mode) {
 
      mkpath(dirname(strdupa(dir)), mode);
      return mkdir(dir, mode);
+}
+
+const char *yacad_version(void) {
+     static char *version = NULL;
+     int n = 0;
+     if (version == NULL) {
+          n = snprintf("", 0, "%d.%d.%d%s%s%s%s",
+                       YACAD_VER_MAJOR, YACAD_VER_MINOR, YACAD_VER_PATCH,
+                       *YACAD_VER_PRERELEASE ? "-" : "", YACAD_VER_PRERELEASE,
+                       *YACAD_VER_METADATA ? "+" : "", YACAD_VER_METADATA);
+          version = malloc(n + 1);
+          snprintf(version, n + 1, "%d.%d.%d%s%s%s%s",
+                   YACAD_VER_MAJOR, YACAD_VER_MINOR, YACAD_VER_PATCH,
+                   *YACAD_VER_PRERELEASE ? "-" : "", YACAD_VER_PRERELEASE,
+                   *YACAD_VER_METADATA ? "+" : "", YACAD_VER_METADATA);
+     }
+     return version;
 }

@@ -23,6 +23,9 @@ int main(int argc, const char * const *argv) {
      yacad_events_t *events = yacad_events_new();
      yacad_scheduler_t *scheduler = yacad_scheduler_new(conf);
      bool_t done = false;
+
+     conf->log(info, "yaCAD core version %s - READY\n", yacad_version());
+
      do {
           scheduler->prepare(scheduler, events);
           done = !events->step(events);

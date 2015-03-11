@@ -56,6 +56,7 @@ typedef struct yacad_conf_impl_s {
      cad_hash_t *runners;
      json_value_t *json;
      int generation;
+     char *filename;
 } yacad_conf_impl_t;
 
 static void taglog(level_t level) {
@@ -155,6 +156,7 @@ static void free_(yacad_conf_impl_t *this) {
      if (this->json != NULL) {
           this->json->accept(this->json, json_kill());
      }
+     free(this->filename);
      free(this);
 }
 
@@ -294,13 +296,14 @@ static void read_conf(yacad_conf_impl_t *this, const char *dir) {
      snprintf(filename, 4096, "%s/core.conf", dir);
      file = fopen(filename, "r");
      if (file != NULL) {
-          printf("Reading configuration file %s\n", filename);
           stream = new_json_input_stream_from_file(file, stdlib_memory);
           this->json = json_parse(stream, on_error, stdlib_memory);
           fclose(file);
           stream->free(stream);
           if (this->json == NULL) {
                fprintf(stderr, "**** Invalid JSON: %s\n", filename);
+          } else {
+               this->filename = strdup(filename);
           }
      }
 }
@@ -525,6 +528,7 @@ yacad_conf_t *yacad_conf_new(void) {
      result->action_script = "yacad_scheduler.sh";
      result->projects = cad_new_hash(stdlib_memory, cad_hash_strings);
      result->runners = cad_new_hash(stdlib_memory, cad_hash_strings);
+     result->filename = NULL;
      result->json = NULL;
      result->generation = 0;
 
@@ -534,6 +538,7 @@ yacad_conf_t *yacad_conf_new(void) {
           }
           if (result->json != NULL) {
                set_logger(result);
+               I(result)->log(info, "Read configuration from %s\n", result->filename);
                read_projects(result);
           }
           ref = result;
