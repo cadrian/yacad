@@ -550,6 +550,11 @@ static void read_projects(yacad_conf_impl_t *this) {
                     cron = NULL;
                     root_path = NULL;
 
+                    // Prepare root_path
+                    n = snprintf("", 0, "%s/%s", this->root_path, name) + 1;
+                    root_path = malloc(n);
+                    snprintf(root_path, n, "%s/%s", this->root_path, name);
+
                     // Prepare scm
                     visit(s, value, "scm");
                     jscm = s->value.object;
@@ -573,11 +578,6 @@ static void read_projects(yacad_conf_impl_t *this) {
                          free(cron);
                          scm->free(scm);
                     } else {
-                         // Prepare root_path
-                         n = snprintf("", 0, "%s/%s", this->root_path, name) + 1;
-                         root_path = malloc(n);
-                         snprintf(root_path, n, "%s/%s", this->root_path, name);
-
                          project = yacad_project_new(I(this), name, scm, cron);
                          if (project == NULL) {
                               free(cron);
