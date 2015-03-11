@@ -497,6 +497,9 @@ static void set_root_path(yacad_conf_impl_t *this) {
           n = jlevel->count(jlevel) + 1;
           this->root_path = malloc(n);
           jlevel->utf8(jlevel, this->root_path, n);
+          if (mkpath(this->root_path, 0700)) {
+               I(this)->log(warn, "Could not create directory: %s\n", this->root_path);
+          }
      } else {
           this->root_path = strdup(".");
      }

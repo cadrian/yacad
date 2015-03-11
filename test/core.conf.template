@@ -3,7 +3,7 @@
         "level": "debug",
     },
     "core": {
-        "root_path": "./.projects",
+        "root_path": "#PATH#/test/projects",
     },
     "projects": [
         {

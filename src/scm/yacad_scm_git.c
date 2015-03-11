@@ -38,9 +38,9 @@ static int yacad_init_counter = 0;
 #endif
 
 static void yacad_git_init(void) {
-#if LIBGIT2_SOVERSION > 21
+#if LIBGIT2_SOVERSION >= 22
      git_libgit2_init();
-#elif LIBGIT2_SOVERSION > 20
+#elif LIBGIT2_SOVERSION == 21
      if (yacad_init_counter++ == 0) {
           git_threads_init();
      }
@@ -48,9 +48,9 @@ static void yacad_git_init(void) {
 }
 
 static void yacad_git_shutdown(void) {
-#if LIBGIT2_SOVERSION > 21
+#if LIBGIT2_SOVERSION >= 22
      git_libgit2_shutdown();
-#elif LIBGIT2_SOVERSION > 20
+#elif LIBGIT2_SOVERSION == 21
      if (--yacad_init_counter == 0) {
           git_threads_shutdown();
      }
@@ -80,16 +80,28 @@ static bool_t __gitcheck(yacad_conf_t *conf, int giterr, level_t level, const ch
 #define gitcheck(conf, gitaction, level) __gitcheck(conf, (gitaction), (level), #gitaction, __LINE__)
 
 static bool_t check(yacad_scm_git_t *this) {
-     /*
-      * git remote update
-      * git status -uno
-      */
-     bool_t result = false;
-     this->fetch_percent = this->index_percent = -1;
-     this->conf->log(info, "Updating remote: %s\n", this->upstream_url);
-     if (gitcheck(this->conf, git_remote_fetch(this->remote, NULL, NULL), warn)) {
-          // TODO
+     bool_t result = false, downloaded;
+
+     if (!gitcheck(this->conf, git_remote_connect(this->remote, GIT_DIRECTION_FETCH), warn)) {
+          // Could not connect to remote
+     } else {
+          this->fetch_percent = this->index_percent = -1;
+          downloaded = gitcheck(this->conf, git_remote_download(this->remote), warn);
+          git_remote_disconnect(this->remote);
+          if (downloaded) {
+               if (!gitcheck(this->conf, git_remote_update_tips(this->remote, NULL, NULL), warn)) {
+                    // Could not update tips
+               } else if (this->fetch_percent == -1 && this->index_percent == -1) {
+                    this->conf->log(debug, "Remote is up-to-date: %s\n", this->upstream_url);
+               } else if (this->fetch_percent != 100 || this->index_percent != 100) {
+                    this->conf->log(warn, "Download incomplete: network %3d%%  /  indexing %3d%%\n", this->fetch_percent, this->index_percent);
+               } else {
+                    this->conf->log(info, "Remote needs building: %s\n", this->upstream_url);
+                    result = true;
+               }
+          }
      }
+
      return result;
 }
 
@@ -136,7 +148,7 @@ yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, json_o
      yacad_scm_git_t *result = NULL;
      git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
      char *upstream_url = NULL;
-     size_t szurl = 0, szpath = strlen(root_path) + 1;
+     size_t szurl = 0, szpath = strlen(root_path) + 5;
      json_string_t *jurl;
      yacad_conf_visitor_t *u = conf->visitor(conf, json_type_string, "upstream_url");
 
@@ -158,9 +170,15 @@ yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, json_o
      result->repo = NULL;
      result->remote = NULL;
 
+     result->fetch_percent = result->index_percent = -1;
+     result->root_path = result->data;
+     result->upstream_url = result->data + szpath;
+     snprintf(result->root_path, szpath, "%s.git", root_path);
+     snprintf(result->upstream_url, szurl, "%s", upstream_url);
+
      yacad_git_init();
 
-     if (gitcheck(conf, git_repository_open(&(result->repo), root_path), debug)) {
+     if (gitcheck(conf, git_repository_open_bare(&(result->repo), result->root_path), debug)) {
           if (gitcheck(conf, git_remote_load(&(result->remote), result->repo, REMOTE_NAME), debug)) {
                if (!gitcheck(conf, git_remote_delete(result->remote), warn)) {
                     goto error;
@@ -168,11 +186,7 @@ yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, json_o
                git_remote_free(result->remote);
           }
      } else {
-          if (mkpath(root_path, 0700)) {
-               conf->log(warn, "Could not create directory: %s\n", root_path);
-               goto error;
-          }
-          if (!gitcheck(conf, git_repository_init(&(result->repo), root_path, false), warn)) {
+          if (!gitcheck(conf, git_repository_init(&(result->repo), result->root_path, true), warn)) {
                goto error;
           }
      }
@@ -187,12 +201,6 @@ yacad_scm_t *yacad_scm_git_new(yacad_conf_t *conf, const char *root_path, json_o
      if (!gitcheck(conf, git_remote_set_callbacks(result->remote, &callbacks), warn)) {
           goto error;
      }
-
-     result->fetch_percent = result->index_percent = -1;
-     result->root_path = result->data;
-     result->upstream_url = result->data + szpath;
-     strncpy(result->root_path, root_path, szpath);
-     strncpy(result->upstream_url, upstream_url, szurl);
 
 ret:
      free(upstream_url);
