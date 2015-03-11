@@ -135,7 +135,10 @@ static int yacad_git_transfer_progress(const git_transfer_progress *stats, yacad
 static int yacad_git_credentials(git_cred **out, const char *url, const char *username_from_url, unsigned int allowed_types, yacad_scm_git_t *this) {
      // TODO one of git_cred_ssh_key_from_agent, git_cred_ssh_key_new, git_cred_userpass_plaintext_new, or git_cred_default_new
      this->log(debug, "calling default cred\n");
-     return git_cred_default_new(out) || git_cred_ssh_key_from_agent(out, username_from_url);
+     if (git_cred_default_new(out) == 0) {
+          return 0;
+     }
+     return git_cred_ssh_key_from_agent(out, username_from_url);
 }
 
 static yacad_scm_t git_fn = {

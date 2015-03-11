@@ -48,11 +48,11 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
           found = same_task(task, *(yacad_task_t**)tasklist->get(tasklist, i));
      }
      if (found) {
-          this->log(debug, "task not added: %s\n", task->serialize(task));
+          this->log(debug, "Task not added: %s\n", task->serialize(task));
           task->free(task);
      } else {
           tasklist->insert(tasklist, n, &task);
-          this->log(info, "added task: %s\n", task->serialize(task));
+          this->log(info, "Added task: %s\n", task->serialize(task));
           // TODO if task.id == 0??
           // TODO save to database
      }
