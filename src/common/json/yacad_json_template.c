@@ -32,7 +32,6 @@ typedef struct {
 
 
 static void free_visitor(yacad_json_template_impl_t *this) {
-     this->env->free(this->env);
      free(this);
 }
 

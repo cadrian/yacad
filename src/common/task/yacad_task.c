@@ -55,7 +55,7 @@ static const char *serialize(yacad_task_impl_t *this) {
      this->desc->accept(this->desc, v);
 
      n = snprintf(result, capacity, "%lu:%lu:%s", this->id, this->timestamp, desc) + 1;
-     if (n < capacity) {
+     if (n > capacity) {
           if (capacity == 0) {
                capacity = 4096;
           }
