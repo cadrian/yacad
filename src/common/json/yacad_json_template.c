@@ -39,12 +39,17 @@ static void free_visitor(yacad_json_template_impl_t *this) {
 static void visit_object(yacad_json_template_impl_t *this, json_object_t *visited) {
      json_object_t *result = json_new_object(stdlib_memory);
      unsigned int i, count = visited->count(visited);
-     char **keys = malloc(count * sizeof(char*));
+     const char **keys = malloc(count * sizeof(char*));
      json_value_t *value;
+     visited->keys(visited, keys);
      for (i = 0; i < count; i++) {
           value = visited->get(visited, keys[i]);
-          value->accept(value, I(I(this)));
-          result->set(result, keys[i], this->result.value);
+          if (value == NULL) {
+               result->set(result, keys[i], NULL);
+          } else {
+               value->accept(value, I(I(this)));
+               result->set(result, keys[i], this->result.value);
+          }
      }
      visited->keys(visited, (const char **)keys);
      free(keys);
@@ -58,8 +63,12 @@ static void visit_array(yacad_json_template_impl_t *this, json_array_t *visited)
      json_value_t *value;
      for (i = 0; i < count; i++) {
           value = visited->get(visited, i);
-          value->accept(value, I(I(this)));
-          result->set(result, i, this->result.value);
+          if (value == NULL) {
+               result->set(result, i, NULL);
+          } else {
+               value->accept(value, I(I(this)));
+               result->set(result, i, this->result.value);
+          }
      }
      this->result.array = result;
 }
