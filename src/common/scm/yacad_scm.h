@@ -18,10 +18,11 @@
 #define __YACAD_SCM_H__
 
 #include "yacad.h"
+#include "common/tasklist/yacad_task.h"
 
 typedef struct yacad_scm_s yacad_scm_t;
 
-typedef bool_t (*yacad_scm_check_fn)(yacad_scm_t *this);
+typedef yacad_task_t *(*yacad_scm_check_fn)(yacad_scm_t *this);
 typedef void (*yacad_scm_free_fn)(yacad_scm_t *this);
 
 struct yacad_scm_s {

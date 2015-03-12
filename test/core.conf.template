@@ -15,16 +15,20 @@
             "scm": {
                 "type": "git",
                 "upstream_url": "file://#PATH#/.git",
+                "actions": [
+                    {
+                        "type": "checkout",
+                        "branch": "${branch}",
+                        "ref": "${ref}",
+                    },
+                    {
+                        "type": "spawn",
+                        "command": "make clean; build/build.sh main",
+                        "artifacts": "target/dpkg/*.deb target/dpkg/*.dsc target/dpkg/*.tar.gz target/dpkg/*.changes",
+                    },
+                ],
             },
             "cron": "* * * * *",
         },
-    ],
-    "runners": [
-        {
-            "name": "test1",
-            "arch": "foo",
-            "host": "localhost",
-            "port": 9572,
-        }
     ],
 }

@@ -127,11 +127,8 @@ static void next_check(yacad_scheduler_impl_t *this) {
 }
 
 static void iterate_check_project(cad_hash_t *projects, int index, const char *project_name, yacad_project_t *project, yacad_scheduler_impl_t *this) {
-     yacad_task_t *task;
-     const char *runner_name = "foo"; // TODO
-     const char *action = "dummy"; // TODO
-     if (project->check(project)) {
-          task = yacad_task_new(0, project_name, runner_name, action);
+     yacad_task_t *task = project->check(project);
+     if (task != NULL) {
           this->tasklist->add(this->tasklist, task);
      }
 }

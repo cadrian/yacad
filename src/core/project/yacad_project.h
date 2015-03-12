@@ -22,12 +22,13 @@
 #include "yacad.h"
 #include "common/cron/yacad_cron.h"
 #include "common/scm/yacad_scm.h"
+#include "common/tasklist/yacad_task.h"
 
 typedef struct yacad_project_s yacad_project_t;
 
 typedef const char *(*yacad_project_get_name_fn)(yacad_project_t *this);
 typedef struct timeval (*yacad_project_next_check_fn)(yacad_project_t *this);
-typedef bool_t (*yacad_project_check_fn)(yacad_project_t *this);
+typedef yacad_task_t *(*yacad_project_check_fn)(yacad_project_t *this);
 typedef json_object_t *(*yacad_get_runner_criteria_fn)(yacad_project_t *this);
 typedef void (*yacad_project_free_fn)(yacad_project_t *this);
 

@@ -17,7 +17,7 @@
 #include <git2.h>
 
 #include "yacad_scm_git.h"
-#include "common/json/yacad_json_visitor.h"
+#include "common/json/yacad_json_finder.h"
 
 #define REMOTE_NAME "yacad_upstream"
 
@@ -79,8 +79,14 @@ static bool_t __gitcheck(logger_t log, int giterr, level_t level, const char *gi
 
 #define gitcheck(log, gitaction, level) __gitcheck(log, (gitaction), (level), #gitaction, __LINE__)
 
-static bool_t check(yacad_scm_git_t *this) {
-     bool_t result = false, downloaded;
+static yacad_task_t *build_task(yacad_scm_git_t *this){
+     yacad_task_t *result = NULL;
+     return result;
+}
+
+static yacad_task_t *check(yacad_scm_git_t *this) {
+     yacad_task_t *result = NULL;
+     bool_t downloaded;
 
      if (!gitcheck(this->log, git_remote_connect(this->remote, GIT_DIRECTION_FETCH), warn)) {
           // Could not connect to remote
@@ -97,7 +103,7 @@ static bool_t check(yacad_scm_git_t *this) {
                     this->log(warn, "Download incomplete: network %3d%%  /  indexing %3d%%\n", this->fetch_percent, this->index_percent);
                } else {
                     this->log(info, "Remote needs building: %s\n", this->upstream_url);
-                    result = true;
+                    result = build_task(this);
                }
           }
      }
@@ -153,7 +159,7 @@ yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_object_
      char *upstream_url = NULL;
      size_t szurl = 0, szpath = strlen(root_path) + 5;
      json_string_t *jurl;
-     yacad_json_visitor_t *u = yacad_json_visitor_new(log, json_type_string, "upstream_url");
+     yacad_json_finder_t *u = yacad_json_finder_new(log, json_type_string, "upstream_url");
 
      u->visit(u, (json_value_t *)desc);
      jurl = u->get_string(u);

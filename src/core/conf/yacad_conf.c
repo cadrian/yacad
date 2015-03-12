@@ -17,7 +17,7 @@
 #include "yacad_conf.h"
 #include "core/project/yacad_project.h"
 #include "common/cron/yacad_cron.h"
-#include "common/json/yacad_json_visitor.h"
+#include "common/json/yacad_json_finder.h"
 
 static const char *dirs[] = {
      "/etc/xdg/yacad",
@@ -115,7 +115,7 @@ static char *read_fd(int fd, const char *script) {
 }
 
 static yacad_task_t *next_task(yacad_conf_impl_t *this) {
-     /* DEAD CODE -- to be moved */
+     /* TODO -- DEAD CODE -- to be moved */
      yacad_task_t *result = NULL;
      const char *script = "yacad_scheduler.sh";
      int res;
@@ -207,7 +207,7 @@ static void read_conf(yacad_conf_impl_t *this, const char *dir) {
 }
 
 static void set_logger(yacad_conf_impl_t *this) {
-     yacad_json_visitor_t *v = yacad_json_visitor_new(I(this)->log, json_type_string, "logging/level");
+     yacad_json_finder_t *v = yacad_json_finder_new(I(this)->log, json_type_string, "logging/level");
      size_t i, n;
      char *level;
      json_string_t *jlevel;
@@ -233,7 +233,7 @@ static void set_logger(yacad_conf_impl_t *this) {
 }
 
 static void set_root_path(yacad_conf_impl_t *this) {
-     yacad_json_visitor_t *v = yacad_json_visitor_new(I(this)->log, json_type_string, "core/root_path");
+     yacad_json_finder_t *v = yacad_json_finder_new(I(this)->log, json_type_string, "core/root_path");
      size_t n;
      json_string_t *jlevel;
      v->visit(v, this->json);
@@ -251,7 +251,7 @@ static void set_root_path(yacad_conf_impl_t *this) {
      I(v)->free(I(v));
 }
 
-static char *json_to_string(yacad_json_visitor_t *v, json_value_t *value, ...) {
+static char *json_to_string(yacad_json_finder_t *v, json_value_t *value, ...) {
      va_list args;
      size_t n;
      json_string_t *string;
@@ -269,10 +269,10 @@ static char *json_to_string(yacad_json_visitor_t *v, json_value_t *value, ...) {
 }
 
 static void read_projects(yacad_conf_impl_t *this) {
-     yacad_json_visitor_t *vprojects = yacad_json_visitor_new(I(this)->log, json_type_array, "projects");
-     yacad_json_visitor_t *vproject;
-     yacad_json_visitor_t *vscm;
-     yacad_json_visitor_t *vrunner;
+     yacad_json_finder_t *vprojects = yacad_json_finder_new(I(this)->log, json_type_array, "projects");
+     yacad_json_finder_t *vproject;
+     yacad_json_finder_t *vscm;
+     yacad_json_finder_t *vrunner;
      json_value_t *jproject;
      json_array_t *jprojects;
      json_object_t *jrunner;
@@ -287,9 +287,9 @@ static void read_projects(yacad_conf_impl_t *this) {
      if (jprojects != NULL) {
           np = jprojects->count(jprojects);
           if (np > 0) {
-               vproject = yacad_json_visitor_new(I(this)->log, json_type_string, "%s");
-               vscm = yacad_json_visitor_new(I(this)->log, json_type_object, "scm");
-               vrunner = yacad_json_visitor_new(I(this)->log, json_type_object, "runner");
+               vproject = yacad_json_finder_new(I(this)->log, json_type_string, "%s");
+               vscm = yacad_json_finder_new(I(this)->log, json_type_object, "scm");
+               vrunner = yacad_json_finder_new(I(this)->log, json_type_object, "runner");
                for (i = 0; i < np; i++) {
                     jproject = jprojects->get(jprojects, i);
                     name = json_to_string(vproject, jproject, "name");

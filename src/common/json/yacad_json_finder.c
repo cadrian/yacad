@@ -14,10 +14,10 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "yacad_json_visitor.h"
+#include "yacad_json_finder.h"
 
 typedef struct {
-     yacad_json_visitor_t fn;
+     yacad_json_finder_t fn;
      logger_t log;
      char *current_path;
      json_type_t expected_type;
@@ -30,33 +30,33 @@ typedef struct {
           json_const_t *constant;
      } value;
      const char *pathformat;
-} yacad_json_visitor_impl_t;
+} yacad_json_finder_impl_t;
 
-static json_object_t *get_object(yacad_json_visitor_impl_t *this) {
+static json_object_t *get_object(yacad_json_finder_impl_t *this) {
      return this->found ? this->value.object : NULL;
 }
 
-static json_array_t *get_array(yacad_json_visitor_impl_t *this) {
+static json_array_t *get_array(yacad_json_finder_impl_t *this) {
      return this->found ? this->value.array : NULL;
 }
 
-static json_string_t *get_string(yacad_json_visitor_impl_t *this) {
+static json_string_t *get_string(yacad_json_finder_impl_t *this) {
      return this->found ? this->value.string : NULL;
 }
 
-static json_number_t *get_number(yacad_json_visitor_impl_t *this) {
+static json_number_t *get_number(yacad_json_finder_impl_t *this) {
      return this->found ? this->value.number : NULL;
 }
 
-static json_const_t *get_const(yacad_json_visitor_impl_t *this) {
+static json_const_t *get_const(yacad_json_finder_impl_t *this) {
      return this->found ? this->value.constant : NULL;
 }
 
-static void free_visitor(yacad_json_visitor_impl_t *this) {
+static void free_visitor(yacad_json_finder_impl_t *this) {
      free(this);
 }
 
-static void visit_object(yacad_json_visitor_impl_t *this, json_object_t *visited) {
+static void visit_object(yacad_json_finder_impl_t *this, json_object_t *visited) {
      char *key = this->current_path;
      char *next_path;
      json_value_t *value;
@@ -74,7 +74,7 @@ static void visit_object(yacad_json_visitor_impl_t *this, json_object_t *visited
      }
 }
 
-static void visit_array(yacad_json_visitor_impl_t *this, json_array_t *visited) {
+static void visit_array(yacad_json_finder_impl_t *this, json_array_t *visited) {
      char *key = this->current_path;
      char *next_path;
      json_value_t *value;
@@ -94,28 +94,28 @@ static void visit_array(yacad_json_visitor_impl_t *this, json_array_t *visited) 
      }
 }
 
-static void visit_string(yacad_json_visitor_impl_t *this, json_string_t *visited) {
+static void visit_string(yacad_json_finder_impl_t *this, json_string_t *visited) {
      this->value.string = visited;
      if (this->current_path[0] == '\0') {
           this->found = (this->expected_type == json_type_string);
      }
 }
 
-static void visit_number(yacad_json_visitor_impl_t *this, json_number_t *visited) {
+static void visit_number(yacad_json_finder_impl_t *this, json_number_t *visited) {
      this->value.number = visited;
      if (this->current_path[0] == '\0') {
           this->found = (this->expected_type == json_type_number);
      }
 }
 
-static void visit_const(yacad_json_visitor_impl_t *this, json_const_t *visited) {
+static void visit_const(yacad_json_finder_impl_t *this, json_const_t *visited) {
      this->value.constant = visited;
      if (this->current_path[0] == '\0') {
           this->found = (this->expected_type == json_type_const);
      }
 }
 
-static void vvisit(yacad_json_visitor_impl_t *this, json_value_t *value, va_list vargs) {
+static void vvisit(yacad_json_finder_impl_t *this, json_value_t *value, va_list vargs) {
      va_list args;
      int n;
      char *path;
@@ -135,14 +135,14 @@ static void vvisit(yacad_json_visitor_impl_t *this, json_value_t *value, va_list
      free(path);
 }
 
-static void visit(yacad_json_visitor_impl_t *this, json_value_t *value, ...) {
+static void visit(yacad_json_finder_impl_t *this, json_value_t *value, ...) {
      va_list args;
      va_start(args, value);
      vvisit(this, value, args);
      va_end(args);
 }
 
-static yacad_json_visitor_t impl_fn = {
+static yacad_json_finder_t impl_fn = {
      .fn = {
           .free = (json_visit_free_fn)free_visitor,
           .visit_object = (json_visit_object_fn)visit_object,
@@ -151,17 +151,17 @@ static yacad_json_visitor_t impl_fn = {
           .visit_number = (json_visit_number_fn)visit_number,
           .visit_const = (json_visit_const_fn)visit_const,
      },
-     .get_object = (yacad_json_visitor_get_object_fn)get_object,
-     .get_array = (yacad_json_visitor_get_array_fn)get_array,
-     .get_string = (yacad_json_visitor_get_string_fn)get_string,
-     .get_number = (yacad_json_visitor_get_number_fn)get_number,
-     .get_const = (yacad_json_visitor_get_const_fn)get_const,
-     .vvisit = (yacad_json_visitor_vvisit_fn)vvisit,
-     .visit = (yacad_json_visitor_visit_fn)visit,
+     .get_object = (yacad_json_finder_get_object_fn)get_object,
+     .get_array = (yacad_json_finder_get_array_fn)get_array,
+     .get_string = (yacad_json_finder_get_string_fn)get_string,
+     .get_number = (yacad_json_finder_get_number_fn)get_number,
+     .get_const = (yacad_json_finder_get_const_fn)get_const,
+     .vvisit = (yacad_json_finder_vvisit_fn)vvisit,
+     .visit = (yacad_json_finder_visit_fn)visit,
 };
 
-yacad_json_visitor_t *yacad_json_visitor_new(logger_t log, json_type_t expected_type, const char *pathformat) {
-     yacad_json_visitor_impl_t *result = malloc(sizeof(yacad_json_visitor_impl_t));
+yacad_json_finder_t *yacad_json_finder_new(logger_t log, json_type_t expected_type, const char *pathformat) {
+     yacad_json_finder_impl_t *result = malloc(sizeof(yacad_json_finder_impl_t));
      result->fn = impl_fn;
      result->log = log;
      result->found = false;

@@ -38,7 +38,7 @@ static struct timeval next_check(yacad_project_impl_t *this) {
      return result;
 }
 
-static bool_t check(yacad_project_impl_t *this) {
+static yacad_task_t *check(yacad_project_impl_t *this) {
      return this->scm->check(this->scm);
 }
 
