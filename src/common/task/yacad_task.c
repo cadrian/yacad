@@ -30,6 +30,14 @@ static unsigned long get_id(yacad_task_impl_t *this) {
      return this->id;
 }
 
+static void set_id(yacad_task_impl_t *this, unsigned long id) {
+     this->id = id;
+}
+
+static time_t get_timestamp(yacad_task_impl_t *this) {
+     return this->timestamp;
+}
+
 static bool_t same_as(yacad_task_impl_t *this, yacad_task_impl_t *other) {
      bool_t result = false;
      static yacad_json_compare_t *cmp = NULL;
@@ -79,18 +87,60 @@ static void free_(yacad_task_impl_t *this) {
 
 static yacad_task_t impl_fn = {
      .get_id = (yacad_task_get_id_fn)get_id,
+     .set_id = (yacad_task_set_id_fn)set_id,
+     .get_timestamp = (yacad_task_get_timestamp_fn)get_timestamp,
      .serialize = (yacad_task_serialize_fn)serialize,
      .same_as = (yacad_task_same_as_fn)same_as,
      .free = (yacad_task_free_fn)free_,
 };
 
 yacad_task_t *yacad_task_unserialize(logger_t log, const char *serial) {
-     // TODO
-     return NULL;
+     yacad_task_impl_t *result = NULL;
+     json_input_stream_t *in;
+     char *ser = (char*)serial;
+     int s = 0;
+     unsigned long id = 0;
+     time_t timestamp = 0;
+     json_value_t *desc = NULL;
+     while (s >= 0) {
+          switch (s) {
+          case 0: // reading id
+               if (*ser == ':') {
+                    s = 1;
+               } else {
+                    id = id * 10 + (*ser - '0');
+               }
+               ser++;
+               break;
+          case 1: // reading timestamp
+               if (*ser == ':') {
+                    s = 2;
+               } else {
+                    timestamp = timestamp * 10 + (*ser - '0');
+               }
+               ser++;
+               break;
+          case 2: // reading desc
+               in = new_json_input_stream_from_string(ser, stdlib_memory);
+               desc = json_parse(in, NULL, stdlib_memory);
+               in->free(in);
+               s = -1;
+          }
+     }
+
+     if (desc != NULL) {
+          result = malloc(sizeof(yacad_task_impl_t));
+          result->fn = impl_fn;
+          result->log = log;
+          result->id = id;
+          result->timestamp = timestamp;
+          result->desc = desc;
+     }
+     return I(result);
 }
 
 yacad_task_t *yacad_task_new(logger_t log, json_value_t *desc, cad_hash_t *env) {
-     yacad_task_impl_t*result = malloc(sizeof(yacad_task_impl_t));
+     yacad_task_impl_t *result = malloc(sizeof(yacad_task_impl_t));
      yacad_json_template_t *template = yacad_json_template_new(log, env);
      result->fn = impl_fn;
      result->log = log;

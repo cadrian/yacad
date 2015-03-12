@@ -22,12 +22,16 @@
 typedef struct yacad_task_s yacad_task_t;
 
 typedef unsigned long (*yacad_task_get_id_fn)(yacad_task_t *this);
+typedef void (*yacad_task_set_id_fn)(yacad_task_t *this, unsigned long id);
+typedef time_t (*yacad_task_get_timestamp_fn)(yacad_task_t *this);
 typedef const char *(*yacad_task_serialize_fn)(yacad_task_t *this);
 typedef bool_t (*yacad_task_same_as_fn)(yacad_task_t *this, yacad_task_t *other);
 typedef void (*yacad_task_free_fn)(yacad_task_t *this);
 
 struct yacad_task_s {
      yacad_task_get_id_fn get_id;
+     yacad_task_set_id_fn set_id;
+     yacad_task_get_timestamp_fn get_timestamp;
      yacad_task_serialize_fn serialize;
      yacad_task_same_as_fn same_as;
      yacad_task_free_fn free;
