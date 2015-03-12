@@ -216,6 +216,7 @@ yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_value_t
                git_remote_free(result->remote);
           }
      } else {
+          log(info, "Initializing repository: %s\n", result->root_path);
           if (!gitcheck(log, git_repository_init(&(result->repo), result->root_path, true), warn)) {
                goto error;
           }
