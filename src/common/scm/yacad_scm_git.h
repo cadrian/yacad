@@ -19,6 +19,6 @@
 
 #include "yacad_scm.h"
 
-yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_object_t *desc);
+yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_value_t *desc);
 
 #endif /* __YACAD_SCM_GIT_H__ */

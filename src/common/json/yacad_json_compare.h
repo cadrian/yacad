@@ -14,24 +14,20 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __YACAD_TASKLIST_H__
-#define __YACAD_TASKLIST_H__
+#ifndef __YACAD_JSON_COMPARE_H__
+#define __YACAD_JSON_COMPARE_H__
 
 #include "yacad.h"
-#include "yacad_task.h"
 
-typedef struct yacad_tasklist_s yacad_tasklist_t;
+typedef struct yacad_json_compare_s yacad_json_compare_t;
 
-typedef void (*yacad_tasklist_add_fn)(yacad_tasklist_t *this, yacad_task_t *task);
-typedef void (*yacad_tasklist_free_fn)(yacad_tasklist_t *this);
-typedef yacad_task_t *(*yacad_tasklist_get_fn)(yacad_tasklist_t *this, const char *runner_name);
+typedef bool_t (*yacad_json_equal_fn)(yacad_json_compare_t *this, json_value_t *v1, json_value_t *v2);
 
-struct yacad_tasklist_s {
-     yacad_tasklist_add_fn add;
-     yacad_tasklist_get_fn get;
-     yacad_tasklist_free_fn free;
+struct yacad_json_compare_s {
+     json_visitor_t fn;
+     yacad_json_equal_fn equal;
 };
 
-yacad_tasklist_t *yacad_tasklist_new(logger_t log);
+yacad_json_compare_t *yacad_json_compare_new(logger_t log);
 
-#endif /* __YACAD_TASKLIST_H__ */
+#endif /* __YACAD_JSON_COMPARE_H__ */

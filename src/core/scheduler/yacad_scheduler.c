@@ -17,7 +17,7 @@
 #include "yacad_scheduler.h"
 #include "yacad_event.h"
 #include "core/project/yacad_project.h"
-#include "common/tasklist/yacad_tasklist.h"
+#include "core/tasklist/yacad_tasklist.h"
 
 typedef enum {
      state_init = 0, state_running, state_stopping, state_stopped
@@ -52,6 +52,7 @@ static void run(int fd, yacad_scheduler_impl_t *this) {
           event = this->event_queue->pull(this->event_queue);
           if (event != NULL) {
                event->run(event);
+               event->free(event);
           }
      }
 }
@@ -133,14 +134,14 @@ static void iterate_check_project(cad_hash_t *projects, int index, const char *p
      }
 }
 
-static void synchronized_check_done(yacad_scheduler_impl_t *this) {
+static void synchronized_check(yacad_scheduler_impl_t *this) {
+     cad_hash_t *projects = this->conf->get_projects(this->conf);
+     projects->iterate(projects, (cad_hash_iterator_fn)iterate_check_project, this);
      this->next_check.state = check_state_done;
 }
 
-static void do_check(yacad_event_t *event, yacad_event_callback callback, yacad_scheduler_impl_t *this) {
-     cad_hash_t *projects = this->conf->get_projects(this->conf);
-     projects->iterate(projects, (cad_hash_iterator_fn)iterate_check_project, this);
-     this->event_queue->synchronized(this->event_queue, (synchronized_data_fn)synchronized_check_done, this);
+static void do_check(yacad_event_t *event, yacad_scheduler_impl_t *this) {
+     this->event_queue->synchronized(this->event_queue, (synchronized_data_fn)synchronized_check, this);
 }
 
 static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
@@ -181,12 +182,12 @@ static yacad_event_t *event_provider(yacad_scheduler_impl_t *this) {
                gettimeofday(&now, NULL);
                if (timercmp(&(this->next_check.time), &now, <)) {
                     this->next_check.state = check_state_checking;
-                    result = yacad_event_new_action((yacad_event_action)do_check, 0, this);
+                    result = yacad_event_new_action((yacad_event_action)do_check, this);
                }
           }
           break;
      case state_stopping:
-          result = yacad_event_new_action((yacad_event_action)do_stop, 0, this);
+          result = yacad_event_new_action((yacad_event_action)do_stop, this);
           break;
      default:
           // ignored

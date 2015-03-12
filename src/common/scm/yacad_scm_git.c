@@ -28,6 +28,7 @@ typedef struct yacad_scm_git_s {
      git_remote *remote;
      int fetch_percent;
      int index_percent;
+     json_value_t *desc;
      char *root_path; // -> data
      char *upstream_url; // -> data + root_path
      char data[0];
@@ -81,6 +82,25 @@ static bool_t __gitcheck(logger_t log, int giterr, level_t level, const char *gi
 
 static yacad_task_t *build_task(yacad_scm_git_t *this){
      yacad_task_t *result = NULL;
+     cad_hash_t *env = cad_new_hash(stdlib_memory, cad_hash_strings);
+     const git_remote_head **heads;
+     git_buf branch = {NULL,0,0};
+     size_t szheads = 0;
+     char ref[GIT_OID_HEXSZ + 1];
+
+     if (gitcheck(this->log, git_remote_ls(&heads, &szheads, this->remote), warn) && szheads > 0) {
+          // The first one is HEAD
+          git_oid_tostr(ref, GIT_OID_HEXSZ + 1, &heads[0]->oid);
+     }
+     gitcheck(this->log, git_remote_default_branch(&branch, this->remote), warn);
+
+     env->set(env, "ref", ref);
+     env->set(env, "branch", branch.ptr);
+
+     result = yacad_task_new(this->log, this->desc, env);
+
+     env->free(env);
+     free(branch.ptr);
      return result;
 }
 
@@ -152,7 +172,7 @@ static yacad_scm_t git_fn = {
      (yacad_scm_free_fn) free_,
 };
 
-yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_object_t *desc) {
+yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_value_t *desc) {
      size_t sz;
      yacad_scm_git_t *result = NULL;
      git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
@@ -178,6 +198,7 @@ yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_object_
      result->log = log;
      result->repo = NULL;
      result->remote = NULL;
+     result->desc = desc;
 
      result->fetch_percent = result->index_percent = -1;
      result->root_path = result->data;

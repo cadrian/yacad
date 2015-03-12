@@ -22,7 +22,7 @@
 #include "yacad.h"
 #include "common/cron/yacad_cron.h"
 #include "common/scm/yacad_scm.h"
-#include "common/tasklist/yacad_task.h"
+#include "common/task/yacad_task.h"
 
 typedef struct yacad_project_s yacad_project_t;
 

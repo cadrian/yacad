@@ -14,22 +14,25 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __YACAD_SCM_H__
-#define __YACAD_SCM_H__
+#ifndef __YACAD_TASKLIST_H__
+#define __YACAD_TASKLIST_H__
 
 #include "yacad.h"
+#include "core/runner/yacad_runner.h"
 #include "common/task/yacad_task.h"
 
-typedef struct yacad_scm_s yacad_scm_t;
+typedef struct yacad_tasklist_s yacad_tasklist_t;
 
-typedef yacad_task_t *(*yacad_scm_check_fn)(yacad_scm_t *this);
-typedef void (*yacad_scm_free_fn)(yacad_scm_t *this);
+typedef void (*yacad_tasklist_add_fn)(yacad_tasklist_t *this, yacad_task_t *task);
+typedef void (*yacad_tasklist_free_fn)(yacad_tasklist_t *this);
+typedef yacad_task_t *(*yacad_tasklist_get_fn)(yacad_tasklist_t *this, yacad_runner_t *runner);
 
-struct yacad_scm_s {
-     yacad_scm_check_fn check;
-     yacad_scm_free_fn free;
+struct yacad_tasklist_s {
+     yacad_tasklist_add_fn add;
+     yacad_tasklist_get_fn get;
+     yacad_tasklist_free_fn free;
 };
 
-yacad_scm_t *yacad_scm_new(logger_t log, json_value_t *desc, const char *root_path);
+yacad_tasklist_t *yacad_tasklist_new(logger_t log);
 
-#endif /* __YACAD_SCM_H__ */
+#endif /* __YACAD_TASKLIST_H__ */

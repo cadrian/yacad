@@ -18,14 +18,14 @@
 #include "yacad_scm_git.h"
 #include "common/json/yacad_json_finder.h"
 
-yacad_scm_t *yacad_scm_new(logger_t log, json_object_t *desc, const char *root_path) {
+yacad_scm_t *yacad_scm_new(logger_t log, json_value_t *desc, const char *root_path) {
      yacad_scm_t *result = NULL;
      yacad_json_finder_t *t = yacad_json_finder_new(log, json_type_string, "type");
      json_string_t *jtype;
      char *type;
      size_t n;
 
-     t->visit(t, (json_value_t *)desc);
+     t->visit(t, desc);
      jtype = t->get_string(t);
      if (jtype == NULL) {
           log(warn, "scm type not set\n");

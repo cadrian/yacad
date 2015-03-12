@@ -14,24 +14,20 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __YACAD_EVENT_H__
-#define __YACAD_EVENT_H__
+#ifndef __YACAD_JSON_TEMPLATE_H__
+#define __YACAD_JSON_TEMPLATE_H__
 
 #include "yacad.h"
-#include "core/conf/yacad_conf.h"
 
-typedef struct yacad_event_s yacad_event_t;
+typedef struct yacad_json_template_s yacad_json_template_t;
 
-typedef void (*yacad_event_run_fn)(yacad_event_t *this);
-typedef void (*yacad_event_free_fn)(yacad_event_t *this);
+typedef json_value_t *(*yacad_json_template_resolve_fn)(yacad_json_template_t *this, json_value_t *template);
 
-struct yacad_event_s {
-     yacad_event_run_fn run;
-     yacad_event_free_fn free;
+struct yacad_json_template_s {
+     json_visitor_t fn;
+     yacad_json_template_resolve_fn resolve;
 };
 
-typedef void (*yacad_event_action)(yacad_event_t *event, void *data);
+yacad_json_template_t *yacad_json_template_new(logger_t log, cad_hash_t *env);
 
-yacad_event_t *yacad_event_new_action(yacad_event_action action, void *data);
-
-#endif /* __YACAD_EVENT_H__ */
+#endif /* __YACAD_JSON_TEMPLATE_H__ */

@@ -23,6 +23,7 @@ typedef struct {
      json_type_t expected_type;
      bool_t found;
      union {
+          json_value_t *value;
           json_object_t *object;
           json_array_t *array;
           json_string_t *string;
@@ -31,6 +32,10 @@ typedef struct {
      } value;
      const char *pathformat;
 } yacad_json_finder_impl_t;
+
+static json_value_t *get_value(yacad_json_finder_impl_t *this) {
+     return this->found ? this->value.value : NULL;
+}
 
 static json_object_t *get_object(yacad_json_finder_impl_t *this) {
      return this->found ? this->value.object : NULL;
@@ -151,6 +156,7 @@ static yacad_json_finder_t impl_fn = {
           .visit_number = (json_visit_number_fn)visit_number,
           .visit_const = (json_visit_const_fn)visit_const,
      },
+     .get_value = (yacad_json_finder_get_value_fn)get_value,
      .get_object = (yacad_json_finder_get_object_fn)get_object,
      .get_array = (yacad_json_finder_get_array_fn)get_array,
      .get_string = (yacad_json_finder_get_string_fn)get_string,

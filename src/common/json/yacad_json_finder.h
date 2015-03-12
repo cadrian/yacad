@@ -29,6 +29,7 @@ typedef enum {
 
 typedef struct yacad_json_finder_s yacad_json_finder_t;
 
+typedef json_value_t *(*yacad_json_finder_get_value_fn)(yacad_json_finder_t *this);
 typedef json_object_t *(*yacad_json_finder_get_object_fn)(yacad_json_finder_t *this);
 typedef json_array_t *(*yacad_json_finder_get_array_fn)(yacad_json_finder_t *this);
 typedef json_string_t *(*yacad_json_finder_get_string_fn)(yacad_json_finder_t *this);
@@ -39,6 +40,7 @@ typedef void (*yacad_json_finder_visit_fn)(yacad_json_finder_t *this, json_value
 
 struct yacad_json_finder_s {
      json_visitor_t fn;
+     yacad_json_finder_get_value_fn get_value;
      yacad_json_finder_get_object_fn get_object;
      yacad_json_finder_get_array_fn get_array;
      yacad_json_finder_get_string_fn get_string;

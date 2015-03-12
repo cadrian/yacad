@@ -19,14 +19,12 @@
 typedef struct yacad_event_impl_s {
      yacad_event_t fn;
      yacad_event_action action;
-     yacad_event_callback callback;
      int timeout;
-     void *action_data;
-     void *callback_data;
+     void *data;
 } yacad_event_impl_t;
 
 static void run(yacad_event_impl_t *this) {
-     this->action(I(this), this->callback, this->action_data);
+     this->action(I(this), this->data);
 }
 
 static void free_(yacad_event_impl_t *this) {
@@ -38,31 +36,10 @@ static yacad_event_t impl_fn = {
      .free = (yacad_event_free_fn)free_,
 };
 
-static void script_action(yacad_event_impl_t *this, yacad_event_callback callback, yacad_conf_t *conf) {
-     yacad_task_t *task;
-     task = conf->next_task(conf);
-     if (task != NULL) {
-          callback(I(this), task, this->callback_data);
-     }
-}
-
-yacad_event_t *yacad_event_new_action(yacad_event_action action, yacad_event_callback callback, void *data) {
+yacad_event_t *yacad_event_new_action(yacad_event_action action, void *data) {
      yacad_event_impl_t *result = malloc(sizeof(yacad_event_impl_t));
      result->fn = impl_fn;
      result->action = action;
-     result->callback = callback;
-     result->action_data = result->callback_data = data;
-     return I(result);
-}
-
-yacad_event_t *yacad_event_new_conf(yacad_conf_t *conf, yacad_event_callback callback, void *data) {
-     yacad_event_impl_t *result = malloc(sizeof(yacad_event_impl_t));
-
-     result->fn = impl_fn;
-     result->action = (yacad_event_action)script_action;
-     result->callback = callback;
-     result->action_data = conf;
-     result->callback_data = data;
-
+     result->data = data;
      return I(result);
 }
