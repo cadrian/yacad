@@ -206,12 +206,15 @@ static yacad_scheduler_t impl_fn = {
 
 yacad_scheduler_t *yacad_scheduler_new(yacad_conf_t *conf) {
      yacad_scheduler_impl_t *result = malloc(sizeof(yacad_scheduler_impl_t));
+     struct timeval now;
+     gettimeofday(&now, NULL);
      result->fn = impl_fn;
      result->conf = conf;
      result->next_check.state = check_state_ready;
      result->next_check.confgen = -1;
+     result->next_check.time = now;
      result->state = state_init;
-     result->tasklist = yacad_tasklist_new(conf->log);
+     result->tasklist = yacad_tasklist_new(conf->log, conf->get_database_name(conf));
      result->event_queue = cad_new_event_queue_pthread(stdlib_memory, (provide_data_fn)event_provider, 16);
      result->state = state_running;
      result->event_queue->start(result->event_queue, result);

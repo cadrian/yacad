@@ -33,6 +33,6 @@ struct yacad_tasklist_s {
      yacad_tasklist_free_fn free;
 };
 
-yacad_tasklist_t *yacad_tasklist_new(logger_t log);
+yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *root_path);
 
 #endif /* __YACAD_TASKLIST_H__ */

@@ -141,12 +141,17 @@ yacad_task_t *yacad_task_unserialize(logger_t log, const char *serial) {
 
 yacad_task_t *yacad_task_new(logger_t log, json_value_t *desc, cad_hash_t *env) {
      yacad_task_impl_t *result = malloc(sizeof(yacad_task_impl_t));
-     yacad_json_template_t *template = yacad_json_template_new(log, env);
+     yacad_json_template_t *template;
      result->fn = impl_fn;
      result->log = log;
      time(&(result->timestamp));
      result->id = 0;
-     result->desc = template->resolve(template, desc);
-     I(template)->free(I(template));
+     if (env == NULL) {
+          result->desc = desc;
+     } else {
+          template = yacad_json_template_new(log, env);
+          result->desc = template->resolve(template, desc);
+          I(template)->free(I(template));
+     }
      return I(result);
 }

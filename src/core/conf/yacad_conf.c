@@ -19,6 +19,8 @@
 #include "common/cron/yacad_cron.h"
 #include "common/json/yacad_json_finder.h"
 
+#define DATABASE_NAME "yacad-core.db"
+
 static const char *dirs[] = {
      "/etc/xdg/yacad",
      "/etc/yacad",
@@ -35,7 +37,12 @@ typedef struct yacad_conf_impl_s {
      int generation;
      char *filename;
      char *root_path;
+     char *database_name;
 } yacad_conf_impl_t;
+
+static const char *get_database_name(yacad_conf_impl_t *this) {
+     return this->database_name;
+}
 
 static cad_hash_t *get_projects(yacad_conf_impl_t *this) {
      return this->projects;
@@ -53,6 +60,7 @@ static void free_(yacad_conf_impl_t *this) {
      if (this->json != NULL) {
           this->json->accept(this->json, json_kill());
      }
+     free(this->database_name);
      free(this->root_path);
      free(this->filename);
      free(this);
@@ -60,6 +68,7 @@ static void free_(yacad_conf_impl_t *this) {
 
 static yacad_conf_t impl_fn =  {
      .log = NULL,
+     .get_database_name = (yacad_conf_get_database_name_fn)get_database_name,
      .get_projects = (yacad_conf_get_projects_fn)get_projects,
      .get_runners = (yacad_conf_get_runners_fn)get_runners,
      .generation = (yacad_conf_generation_fn)generation,
@@ -125,6 +134,7 @@ static void set_root_path(yacad_conf_impl_t *this) {
      yacad_json_finder_t *v = yacad_json_finder_new(I(this)->log, json_type_string, "core/root_path");
      size_t n;
      json_string_t *jlevel;
+
      v->visit(v, this->json);
      jlevel = v->get_string(v);
      if (jlevel != NULL) {
@@ -138,6 +148,11 @@ static void set_root_path(yacad_conf_impl_t *this) {
           this->root_path = strdup(".");
      }
      I(v)->free(I(v));
+
+     n = snprintf("", 0, "%s/%s", this->root_path, DATABASE_NAME) + 1;
+     this->database_name = realloc(this->database_name, n);
+     sprintf(this->database_name, "%s/%s", this->root_path, DATABASE_NAME);
+     I(this)->log(debug, "Database is %s\n", this->database_name);
 }
 
 static char *json_to_string(yacad_json_finder_t *v, json_value_t *value, ...) {
@@ -258,7 +273,7 @@ yacad_conf_t *yacad_conf_new(void) {
 
      result->projects = cad_new_hash(stdlib_memory, cad_hash_strings);
      result->runners = cad_new_hash(stdlib_memory, cad_hash_strings);
-     result->filename = result->root_path = NULL;
+     result->filename = result->root_path = result->database_name = NULL;
      result->json = NULL;
      result->generation = 0;
 
