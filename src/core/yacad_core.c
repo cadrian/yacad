@@ -30,6 +30,9 @@ int main(int argc, const char * const *argv) {
           scheduler->prepare(scheduler, events);
           done = !events->step(events);
      } while (!done);
+
      scheduler->free(scheduler);
+     events->free(events);
+     conf->free(conf);
      return 0;
 }
