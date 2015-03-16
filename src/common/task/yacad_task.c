@@ -23,6 +23,7 @@ typedef struct yacad_task_impl_s {
      logger_t log;
      unsigned long id;
      time_t timestamp;
+     yacad_task_status_t status;
      json_value_t *desc;
 } yacad_task_impl_t;
 
@@ -36,6 +37,14 @@ static void set_id(yacad_task_impl_t *this, unsigned long id) {
 
 static time_t get_timestamp(yacad_task_impl_t *this) {
      return this->timestamp;
+}
+
+static yacad_task_status_t get_status(yacad_task_impl_t *this) {
+     return this->status;
+}
+
+static void set_status(yacad_task_impl_t *this, yacad_task_status_t status) {
+     this->status = status;
 }
 
 static bool_t same_as(yacad_task_impl_t *this, yacad_task_impl_t *other) {
@@ -62,7 +71,7 @@ static const char *serialize(yacad_task_impl_t *this) {
 
      this->desc->accept(this->desc, v);
 
-     n = snprintf(result, capacity, "%lu:%lu:%s", this->id, this->timestamp, desc) + 1;
+     n = snprintf(result, capacity, "%s", desc) + 1;
      if (n > capacity) {
           if (capacity == 0) {
                capacity = 4096;
@@ -71,7 +80,7 @@ static const char *serialize(yacad_task_impl_t *this) {
                capacity *= 2;
           }
           result = realloc(result, capacity);
-          snprintf(result, capacity, "%lu:%lu:%s", this->id, this->timestamp, desc);
+          snprintf(result, capacity, "%s", desc);
      }
 
      v->free(v);
@@ -89,44 +98,18 @@ static yacad_task_t impl_fn = {
      .get_id = (yacad_task_get_id_fn)get_id,
      .set_id = (yacad_task_set_id_fn)set_id,
      .get_timestamp = (yacad_task_get_timestamp_fn)get_timestamp,
+     .get_status = (yacad_task_get_status_fn)get_status,
+     .set_status = (yacad_task_set_status_fn)set_status,
      .serialize = (yacad_task_serialize_fn)serialize,
      .same_as = (yacad_task_same_as_fn)same_as,
      .free = (yacad_task_free_fn)free_,
 };
 
-yacad_task_t *yacad_task_unserialize(logger_t log, const char *serial) {
+yacad_task_t *yacad_task_unserialize(logger_t log, unsigned long id, time_t timestamp, yacad_task_status_t status, char *serial) {
      yacad_task_impl_t *result = NULL;
-     json_input_stream_t *in;
-     char *ser = (char*)serial;
-     int s = 0;
-     unsigned long id = 0;
-     time_t timestamp = 0;
-     json_value_t *desc = NULL;
-     while (s >= 0) {
-          switch (s) {
-          case 0: // reading id
-               if (*ser == ':') {
-                    s = 1;
-               } else {
-                    id = id * 10 + (*ser - '0');
-               }
-               ser++;
-               break;
-          case 1: // reading timestamp
-               if (*ser == ':') {
-                    s = 2;
-               } else {
-                    timestamp = timestamp * 10 + (*ser - '0');
-               }
-               ser++;
-               break;
-          case 2: // reading desc
-               in = new_json_input_stream_from_string(ser, stdlib_memory);
-               desc = json_parse(in, NULL, stdlib_memory);
-               in->free(in);
-               s = -1;
-          }
-     }
+     json_input_stream_t *in = new_json_input_stream_from_string(serial, stdlib_memory);
+     json_value_t *desc = json_parse(in, NULL, stdlib_memory);
+     in->free(in);
 
      if (desc != NULL) {
           result = malloc(sizeof(yacad_task_impl_t));
@@ -134,6 +117,7 @@ yacad_task_t *yacad_task_unserialize(logger_t log, const char *serial) {
           result->log = log;
           result->id = id;
           result->timestamp = timestamp;
+          result->status = status;
           result->desc = desc;
      }
      return I(result);
@@ -146,6 +130,7 @@ yacad_task_t *yacad_task_new(logger_t log, json_value_t *desc, cad_hash_t *env) 
      result->log = log;
      time(&(result->timestamp));
      result->id = 0;
+     result->status = task_new;
      if (env == NULL) {
           result->desc = desc;
      } else {

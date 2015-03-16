@@ -20,11 +20,14 @@
 
 #define STMT_CREATE_TABLE "create table TASKLIST ("      \
      "ID integer primary key asc autoincrement, "        \
+     "TIMESTAMP integer not null, "                      \
+     "STATUS integer not null, "                         \
      "SER not null"                                      \
      ")"
 
-#define STMT_SELECT "select ID, SER from TASKLIST order by ID asc"
-#define STMT_INSERT "insert into TASKLIST (SER) values (?)"
+#define STMT_SELECT "select ID, TIMESTAMP, STATUS, SER from TASKLIST where STATUS=? order by ID asc"
+#define STMT_INSERT "insert into TASKLIST (TIMESTAMP, STATUS, SER) values (?,?,?)"
+#define STMT_UPDATE "update TASKLIST set STATUS=? where ID = ?"
 
 typedef struct yacad_tasklist_impl_s {
      yacad_tasklist_t fn;
@@ -61,6 +64,8 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
      yacad_task_t *other;
      sqlite3_stmt *query = NULL;
      const char *ser = task->serialize(task);
+     time_t timestamp = task->get_timestamp(task);
+     yacad_task_status_t status = task->get_status(task);
 
      n = this->tasklist->count(this->tasklist);
      for (i = 0; !found && i < n; i++) {
@@ -72,7 +77,9 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
           task->free(task);
      } else {
           if (sqlcheck(this->db, this->log, sqlite3_prepare_v2(this->db, STMT_INSERT, -1, &query, NULL), warn)) {
-               sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 1, ser, strlen(ser), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
+               sqlcheck(this->db, this->log, sqlite3_bind_int64(query, 1, (sqlite3_int64)timestamp), warn);
+               sqlcheck(this->db, this->log, sqlite3_bind_int(query, 2, (int)status), warn);
+               sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 3, ser, strlen(ser), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
                sqlite3_step(query);
                task->set_id(task, (unsigned long)sqlite3_last_insert_rowid(this->db));
                sqlcheck(this->db, this->log, sqlite3_finalize(query), warn);
@@ -113,9 +120,8 @@ static yacad_tasklist_t impl_fn = {
      .free = (yacad_tasklist_free_fn)free_,
 };
 
-static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, const unsigned char *sql_desc) {
-     yacad_task_t *task = yacad_task_unserialize(this->log, (char*)sql_desc);
-     task->set_id(task, (unsigned long)sql_id); // because the serialized one is most certainly 0
+static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, sqlite3_int64 sql_timestamp, int sql_status, const unsigned char *sql_desc) {
+     yacad_task_t *task = yacad_task_unserialize(this->log, (unsigned long)sql_id, (time_t)sql_timestamp, (yacad_task_status_t)sql_status, (char*)sql_desc);
      this->tasklist->insert(this->tasklist, this->tasklist->count(this->tasklist), &task);
      this->log(info, "Restored task: %s\n", task->serialize(task));
 }
@@ -155,6 +161,7 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
      result->db = db;
 
      if (sqlcheck(db, log, sqlite3_prepare_v2(db, STMT_SELECT, -1, &query, NULL), warn)) {
+          sqlcheck(db, log, sqlite3_bind_int(query, 1, (int)task_new), warn);
           do {
                err = sqlite3_step(query);
                switch(err) {
@@ -169,7 +176,9 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
                case SQLITE_ROW:
                     add_task(result,
                              sqlite3_column_int64(query, 0),
-                             sqlite3_column_text(query, 1));
+                             sqlite3_column_int64(query, 1),
+                             sqlite3_column_int(query, 2),
+                             sqlite3_column_text(query, 3));
                     break;
                default:
                     sqlcheck(db, log, err, warn);
