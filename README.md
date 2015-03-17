@@ -2,6 +2,15 @@
 
 Light-weight continuous integration. Written in C. Must work on an ARM platform.
 
+# Usage
+
+By default, yaCAD listens on port 1789, not bound to any particular
+interface.
+
+The program comes in two main components:
+* The core: the main server
+* The runners: they talk to the runner to get work
+
 # Design
 
 ## Core
@@ -18,11 +27,13 @@ The main program.
 * Manages a serialized list of tasks (sqlite)
 * Receives results from Runners and prepares new tasks accordingly
 * Pings Runners
-* Manages the conf for the CGI (note: only Core conf; runner conf is not managed)
+* Manages the conf for the CGI (note: only Core conf; runner conf is
+  not managed)
 
 ## Runner
 
-The executor. There can be more than one; they register to the core by name; each name is unique.
+The executor. There can be more than one; they register to the core by
+name; each name is unique.
 
 * Reads some conf to find out:
     * its name

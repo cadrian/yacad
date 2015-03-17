@@ -20,6 +20,8 @@
 #include "common/json/yacad_json_finder.h"
 
 #define DATABASE_NAME "yacad-core.db"
+#define DEFAULT_PORT 1789
+#define DEFAULT_ROOT_PATH "."
 
 static const char *dirs[] = {
      "/etc/xdg/yacad",
@@ -38,10 +40,15 @@ typedef struct yacad_conf_impl_s {
      char *filename;
      char *root_path;
      char *database_name;
+     char *endpoint_name;
 } yacad_conf_impl_t;
 
 static const char *get_database_name(yacad_conf_impl_t *this) {
      return this->database_name;
+}
+
+static const char *get_endpoint_name(yacad_conf_impl_t *this) {
+     return this->endpoint_name;
 }
 
 static cad_hash_t *get_projects(yacad_conf_impl_t *this) {
@@ -60,6 +67,7 @@ static void free_(yacad_conf_impl_t *this) {
      if (this->json != NULL) {
           this->json->accept(this->json, json_kill());
      }
+     free(this->endpoint_name);
      free(this->database_name);
      free(this->root_path);
      free(this->filename);
@@ -69,6 +77,7 @@ static void free_(yacad_conf_impl_t *this) {
 static yacad_conf_t impl_fn =  {
      .log = NULL,
      .get_database_name = (yacad_conf_get_database_name_fn)get_database_name,
+     .get_endpoint_name = (yacad_conf_get_endpoint_name_fn)get_endpoint_name,
      .get_projects = (yacad_conf_get_projects_fn)get_projects,
      .get_runners = (yacad_conf_get_runners_fn)get_runners,
      .generation = (yacad_conf_generation_fn)generation,
@@ -131,28 +140,43 @@ static void set_logger(yacad_conf_impl_t *this) {
 }
 
 static void set_root_path(yacad_conf_impl_t *this) {
-     yacad_json_finder_t *v = yacad_json_finder_new(I(this)->log, json_type_string, "core/root_path");
+     yacad_json_finder_t *v = yacad_json_finder_new(I(this)->log, json_type_string, "core/%s");
      size_t n;
-     json_string_t *jlevel;
+     json_string_t *jstring;
 
-     v->visit(v, this->json);
-     jlevel = v->get_string(v);
-     if (jlevel != NULL) {
-          n = jlevel->count(jlevel) + 1;
-          this->root_path = malloc(n);
-          jlevel->utf8(jlevel, this->root_path, n);
+     v->visit(v, this->json, "root_path");
+     jstring = v->get_string(v);
+     if (jstring != NULL) {
+          n = jstring->count(jstring) + 1;
+          this->root_path = realloc(this->root_path, n);
+          jstring->utf8(jstring, this->root_path, n);
           if (mkpath(this->root_path, 0700) != 0 && errno != EEXIST) {
-               I(this)->log(warn, "Could not create directory: %s (%s)\n", this->root_path, strerror(errno));
+               I(this)->log(warn, "Could not create directory: %s (%s)", this->root_path, strerror(errno));
           }
      } else {
-          this->root_path = strdup(".");
+          n = snprintf("", 0, "%s", DEFAULT_ROOT_PATH) + 1;
+          this->root_path = realloc(this->root_path, n);
+          snprintf(this->root_path, n, "%s", DEFAULT_ROOT_PATH);
      }
+
+     v->visit(v, this->json, "endpoint");
+     jstring = v->get_string(v);
+     if (jstring != NULL) {
+          n = jstring->count(jstring) + 1;
+          this->endpoint_name = realloc(this->endpoint_name, n);
+          jstring->utf8(jstring, this->endpoint_name, n);
+     } else {
+          n = snprintf("", 0, "tcp://*:%d", DEFAULT_PORT) + 1;
+          this->endpoint_name = realloc(this->endpoint_name, n);
+          snprintf(this->endpoint_name, n, "tcp://*:%d", DEFAULT_PORT);
+     }
+
      I(v)->free(I(v));
 
      n = snprintf("", 0, "%s/%s", this->root_path, DATABASE_NAME) + 1;
      this->database_name = realloc(this->database_name, n);
      sprintf(this->database_name, "%s/%s", this->root_path, DATABASE_NAME);
-     I(this)->log(debug, "Database is %s\n", this->database_name);
+     I(this)->log(debug, "Database is %s", this->database_name);
 }
 
 static char *json_to_string(yacad_json_finder_t *v, json_value_t *value, ...) {
@@ -198,9 +222,9 @@ static void read_projects(yacad_conf_impl_t *this) {
                     jproject = jprojects->get(jprojects, i);
                     name = json_to_string(vproject, jproject, "name");
                     if (name == NULL) {
-                         I(this)->log(warn, "Project without name!\n");
+                         I(this)->log(warn, "Project without name!");
                     } else if (this->projects->get(this->projects, name) != NULL) {
-                         I(this)->log(warn, "Duplicate project name: \"%s\"\n", name);
+                         I(this)->log(warn, "Duplicate project name: \"%s\"", name);
                     } else {
                          scm = NULL;
                          cron = NULL;
@@ -231,12 +255,12 @@ static void read_projects(yacad_conf_impl_t *this) {
                          jrunner = vrunner->get_object(vrunner);
 
                          if (scm == NULL) {
-                              I(this)->log(warn, "Project \"%s\": undefined scm\n", name);
+                              I(this)->log(warn, "Project \"%s\": undefined scm", name);
                               if (cron != NULL) {
                                    cron->free(cron);
                               }
                          } else if (cron == NULL) {
-                              I(this)->log(warn, "Project \"%s\": invalid cron\n", name);
+                              I(this)->log(warn, "Project \"%s\": invalid cron", name);
                               scm->free(scm);
                          } else {
                               project = yacad_project_new(I(this)->log, name, scm, cron, jrunner);
@@ -244,7 +268,7 @@ static void read_projects(yacad_conf_impl_t *this) {
                                    cron->free(cron);
                                    scm->free(scm);
                               } else {
-                                   I(this)->log(info, "Adding project: %s [%s]\n", name, crondesc);
+                                   I(this)->log(info, "Adding project: %s [%s]", name, crondesc);
                                    this->projects->set(this->projects, name, project);
                               }
                          }
@@ -273,7 +297,7 @@ yacad_conf_t *yacad_conf_new(void) {
 
      result->projects = cad_new_hash(stdlib_memory, cad_hash_strings);
      result->runners = cad_new_hash(stdlib_memory, cad_hash_strings);
-     result->filename = result->root_path = result->database_name = NULL;
+     result->filename = result->root_path = result->database_name = result->endpoint_name = NULL;
      result->json = NULL;
      result->generation = 0;
 
@@ -283,9 +307,10 @@ yacad_conf_t *yacad_conf_new(void) {
           }
           if (result->json != NULL) {
                set_logger(result);
-               I(result)->log(info, "Read configuration from %s\n", result->filename);
+               I(result)->log(info, "Read configuration from %s", result->filename);
                set_root_path(result);
-               I(result)->log(info, "Projects root path is %s\n", result->root_path);
+               I(result)->log(info, "Projects root path is %s", result->root_path);
+               I(result)->log(info, "Core 0MQ endpoint is %s", result->endpoint_name);
                read_projects(result);
           }
           ref = result;

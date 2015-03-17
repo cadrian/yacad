@@ -113,7 +113,7 @@ static void visit_string(yacad_json_template_impl_t *this, json_string_t *visite
                          if (env != NULL) {
                               result->add_string(result, "%s", env);
                          } else {
-                              this->log(warn, "Unknown env ${%.*s}\n", (int)(i - e), template + e);
+                              this->log(warn, "Unknown env ${%.*s}", (int)(i - e), template + e);
                          }
                          s = 0;
                     }

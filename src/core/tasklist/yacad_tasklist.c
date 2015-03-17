@@ -42,14 +42,14 @@ static bool_t __sqlcheck(sqlite3 *db, logger_t log, int sqlerr, level_t level, c
      char *paren;
      int len;
      if (sqlerr != SQLITE_OK) {
-          log(debug, "Error line %u: %s\n", line, sqlaction);
+          log(debug, "Error line %u: %s", line, sqlaction);
           paren = strchrnul(sqlaction, '(');
           len = paren - sqlaction;
           msg = db == NULL ? NULL : sqlite3_errmsg(db);
           if (msg == NULL) {
-               log(level, "%.*s: error %d\n", len, sqlaction, sqlerr);
+               log(level, "%.*s: error %d", len, sqlaction, sqlerr);
           } else {
-               log(level, "%.*s: error %d: %s\n", len, sqlaction, sqlerr, msg);
+               log(level, "%.*s: error %d: %s", len, sqlaction, sqlerr, msg);
           }
           result = false;
      }
@@ -73,7 +73,7 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
           found = task->same_as(task, other);
      }
      if (found) {
-          this->log(debug, "Task not added: %s\n", ser);
+          this->log(debug, "Task not added: %s", ser);
           task->free(task);
      } else {
           if (sqlcheck(this->db, this->log, sqlite3_prepare_v2(this->db, STMT_INSERT, -1, &query, NULL), warn)) {
@@ -86,7 +86,7 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
           }
 
           ser = task->serialize(task);
-          this->log(info, "Added task: %s\n", ser);
+          this->log(info, "Added task: %s", ser);
           this->tasklist->insert(this->tasklist, n, &task);
      }
 }
@@ -123,7 +123,7 @@ static yacad_tasklist_t impl_fn = {
 static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, sqlite3_int64 sql_timestamp, int sql_status, const unsigned char *sql_desc) {
      yacad_task_t *task = yacad_task_unserialize(this->log, (unsigned long)sql_id, (time_t)sql_timestamp, (yacad_task_status_t)sql_status, (char*)sql_desc);
      this->tasklist->insert(this->tasklist, this->tasklist->count(this->tasklist), &task);
-     this->log(info, "Restored task: %s\n", task->serialize(task));
+     this->log(info, "Restored task: %s", task->serialize(task));
 }
 
 yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
@@ -136,7 +136,7 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
 
      if (!init) {
           if (!sqlcheck(NULL, log, sqlite3_initialize(), debug)) {
-               log(warn, "Could not initialize database: %s\n", database_name);
+               log(warn, "Could not initialize database: %s", database_name);
                return NULL;
           }
           init = true;
@@ -144,11 +144,11 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
 
      if (!sqlcheck(NULL, log, sqlite3_open_v2(database_name, &db, SQLITE_OPEN_READWRITE, NULL), debug)) {
           if (!sqlcheck(NULL, log, sqlite3_open_v2(database_name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL), debug)) {
-               log(warn, "Could not create database: %s\n", database_name);
+               log(warn, "Could not create database: %s", database_name);
                return NULL;
           }
           if (!sqlcheck(db, log, sqlite3_exec(db, STMT_CREATE_TABLE, NULL, NULL, NULL), debug)) {
-               log(warn, "Could not create table\n");
+               log(warn, "Could not create table");
                sqlite3_close(db);
                return NULL;
           }
@@ -169,7 +169,7 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
                     done = true;
                     break;
                case SQLITE_BUSY:
-                    log(info, "Database is busy, waiting one second\n");
+                    log(info, "Database is busy, waiting one second");
                     sleep(1);
                     break;
                case SQLITE_OK: // ??

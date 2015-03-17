@@ -64,14 +64,14 @@ static bool_t __gitcheck(logger_t log, int giterr, level_t level, const char *gi
      char *paren;
      int len;
      if (giterr != 0) {
-          log(debug, "Error line %u: %s\n", line, gitaction);
+          log(debug, "Error line %u: %s", line, gitaction);
           paren = strchrnul(gitaction, '(');
           len = paren - gitaction;
           e = giterr_last();
           if (e == NULL) {
-               log(level, "%.*s: error %d\n", len, gitaction, giterr);
+               log(level, "%.*s: error %d", len, gitaction, giterr);
           } else {
-               log(level, "%.*s: error %d/%d: %s\n", len, gitaction, giterr, e->klass, e->message);
+               log(level, "%.*s: error %d/%d: %s", len, gitaction, giterr, e->klass, e->message);
           }
           result = false;
      }
@@ -118,11 +118,11 @@ static yacad_task_t *check(yacad_scm_git_t *this) {
                if (!gitcheck(this->log, git_remote_update_tips(this->remote, NULL, NULL), warn)) {
                     // Could not update tips
                } else if (this->fetch_percent == -1 && this->index_percent == -1) {
-                    this->log(debug, "Remote is up-to-date: %s\n", this->upstream_url);
+                    this->log(debug, "Remote is up-to-date: %s", this->upstream_url);
                } else if (this->fetch_percent != 100 || this->index_percent != 100) {
-                    this->log(warn, "Download incomplete: network %3d%%  /  indexing %3d%%\n", this->fetch_percent, this->index_percent);
+                    this->log(warn, "Download incomplete: network %3d%%  /  indexing %3d%%", this->fetch_percent, this->index_percent);
                } else {
-                    this->log(info, "Remote needs building: %s\n", this->upstream_url);
+                    this->log(info, "Remote needs building: %s", this->upstream_url);
                     result = build_task(this);
                }
           }
@@ -139,7 +139,7 @@ static void free_(yacad_scm_git_t *this) {
 }
 
 static int yacad_git_sideband_progress(const char *str, int len, yacad_scm_git_t *this) {
-     this->log(debug, "%.*s\n", len, str);
+     this->log(debug, "%.*s", len, str);
      return 0;
 }
 
@@ -149,7 +149,7 @@ static int yacad_git_transfer_progress(const git_transfer_progress *stats, yacad
     int kbytes = stats->received_bytes / 1024;
 
     if (fetch_percent != this->fetch_percent || index_percent != this->index_percent) {
-         this->log(debug, "Transfer: network %3d%% (%4d Kib, %5d/%5d)  /  indexing %3d%% (%5d/%5d)\n",
+         this->log(debug, "Transfer: network %3d%% (%4d Kib, %5d/%5d)  /  indexing %3d%% (%5d/%5d)",
                    fetch_percent, kbytes, stats->received_objects, stats->total_objects,
                    index_percent, stats->indexed_objects, stats->total_objects);
          this->fetch_percent = fetch_percent;
@@ -160,7 +160,7 @@ static int yacad_git_transfer_progress(const git_transfer_progress *stats, yacad
 
 static int yacad_git_credentials(git_cred **out, const char *url, const char *username_from_url, unsigned int allowed_types, yacad_scm_git_t *this) {
      // TODO one of git_cred_ssh_key_from_agent, git_cred_ssh_key_new, git_cred_userpass_plaintext_new, or git_cred_default_new
-     this->log(debug, "calling default cred\n");
+     this->log(debug, "calling default cred");
      if (git_cred_default_new(out) == 0) {
           return 0;
      }
@@ -184,7 +184,7 @@ yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_value_t
      u->visit(u, (json_value_t *)desc);
      jurl = u->get_string(u);
      if (jurl == NULL) {
-          log(warn, "No upstream url\n");
+          log(warn, "No upstream url");
           goto error;
      }
      szurl = jurl->utf8(jurl, "", 0) + 1;
@@ -216,7 +216,7 @@ yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_value_t
                git_remote_free(result->remote);
           }
      } else {
-          log(info, "Initializing repository: %s\n", result->root_path);
+          log(info, "Initializing repository: %s", result->root_path);
           if (!gitcheck(log, git_repository_init(&(result->repo), result->root_path, true), warn)) {
                goto error;
           }

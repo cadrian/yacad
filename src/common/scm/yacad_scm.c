@@ -28,7 +28,7 @@ yacad_scm_t *yacad_scm_new(logger_t log, json_value_t *desc, const char *root_pa
      t->visit(t, desc);
      jtype = t->get_string(t);
      if (jtype == NULL) {
-          log(warn, "scm type not set\n");
+          log(warn, "scm type not set");
      } else {
           n = jtype->utf8(jtype, "", 0) + 1;
           type = alloca(n);
@@ -36,7 +36,7 @@ yacad_scm_t *yacad_scm_new(logger_t log, json_value_t *desc, const char *root_pa
           if (!strncmp("git", type, n)) {
                result = yacad_scm_git_new(log, root_path, desc);
           } else {
-               log(warn, "scm type not supported: %s\n", type);
+               log(warn, "scm type not supported: %s", type);
           }
      }
 

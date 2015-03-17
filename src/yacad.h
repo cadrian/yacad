@@ -95,7 +95,7 @@ int mkpath(const char *dir, mode_t mode);
 
 logger_t get_logger(level_t level);
 
-void *get_zmq_context(logger_t log);
-void del_zmq_context(logger_t log);
+void *get_zmq_context(void);
+void del_zmq_context(void);
 
 #endif /* __YACAD_H__ */

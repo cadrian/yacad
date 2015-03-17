@@ -17,85 +17,117 @@
 #include "yacad.h"
 
 #define DATETIME_FORMAT "%Y-%m-%d %H:%M:%S"
+#define INPROC_ADDRESS "inproc://logger"
 
-static void taglog(level_t level) {
+static void *logger_routine(void *nul) {
+     void *zcontext = get_zmq_context();
+     void *zscheduler = zmq_socket(zcontext, ZMQ_REP);
+     zmq_msg_t msg;
+     int n, c = 0;
+     char *logmsg = NULL;
+     zmq_pollitem_t zitems[] = {
+          {zscheduler, 0, ZMQ_POLLIN, 0},
+     };
+
+     zmq_bind(zscheduler, INPROC_ADDRESS); // TODO error checking
+     do {
+          zmq_poll(zitems, 1, -1);
+
+          if (zitems[0].revents & ZMQ_POLLIN) {
+               zmq_msg_init(&msg); // TODO error checking
+               n = zmq_msg_recv(&msg, zscheduler, 0); // TODO error checking
+               if (n == -1) {
+                    fprintf(stderr, ">>>> %d: %s\n", errno, strerror(errno));
+               } else if (n > 0) {
+                    if (c < n) {
+                         logmsg = realloc(logmsg, n);
+                         c = n;
+                    }
+                    memcpy(logmsg, zmq_msg_data(&msg), n);
+                    fprintf(stderr, "%s\n", logmsg);
+               }
+               zmq_msg_close(&msg); // TODO error checking
+
+               zmq_send(zscheduler, "", 0, 0);
+          }
+     } while (true);
+
+     free(logmsg);
+
+     return nul;
+}
+
+static void send_log(level_t level, char *format, va_list arg) {
+     void *zcontext = get_zmq_context();
+     void *zlogger = zmq_socket(zcontext, ZMQ_REQ);
      struct timeval tm;
-     char buffer[20];
-     static char *tag[] = {
+     char tag[40];
+     static char *tagname[] = {
           "WARN ",
           "INFO ",
           "DEBUG",
           "TRACE",
      };
+     char date[20];
+     zmq_msg_t msg;
+     int t, n;
+     va_list zarg;
+     char *logmsg;
+
      gettimeofday(&tm, NULL);
-     fprintf(stderr, "%s.%06ld [%s] ", datetime(tm.tv_sec, buffer), tm.tv_usec, tag[level]);
+     tag[39] = '\0';
+     t = snprintf(tag, 39, "%s.%06ld [%s] ", datetime(tm.tv_sec, date), tm.tv_usec, tagname[level]);
+
+     va_copy(zarg, arg);
+     n = vsnprintf("", 0, format, zarg);
+     va_end(zarg);
+
+     logmsg = malloc(t + n + 1);
+     t = snprintf(logmsg, t + 1, "%s", tag);
+     va_copy(zarg, arg);
+     n = vsnprintf(logmsg + t, n + 1, format, zarg);
+     va_end(zarg);
+
+     zmq_connect(zlogger, INPROC_ADDRESS); // TODO error checking
+
+     zmq_msg_init_size(&msg, t + n + 1);
+     memcpy(zmq_msg_data(&msg), logmsg, t + n + 1);
+     zmq_msg_send(&msg, zlogger, 0); // TODO error checking
+     zmq_msg_close(&msg); // TODO error checking
+
+     zmq_recv(zlogger, "", 0, 0);
+
+     zmq_disconnect(zlogger, INPROC_ADDRESS);
+
+     free(logmsg);
 }
 
-static int warn_logger(level_t level, char *format, ...) {
-     static bool_t nl = true;
-     int result = 0;
-     va_list arg;
-     if(level <= warn) {
-          va_start(arg, format);
-          if (nl) {
-               taglog(level);
-          }
-          result = vfprintf(stderr, format, arg);
-          va_end(arg);
-          nl = format[strlen(format)-1] == '\n';
+#define DEFUN_LOGGER(__level) \
+     static int __level##_logger(level_t level, char *format, ...) {    \
+          int result = 0;                                               \
+          va_list arg;                                                  \
+          if (level <= __level) {                                       \
+               va_start(arg, format);                                   \
+               send_log(level, format, arg);                            \
+               va_end(arg);                                             \
+          }                                                             \
+          return result;                                                \
      }
-     return result;
-}
 
-static int info_logger(level_t level, char *format, ...) {
-     static bool_t nl = true;
-     int result = 0;
-     va_list arg;
-     if(level <= info) {
-          va_start(arg, format);
-          if (nl) {
-               taglog(level);
-          }
-          result = vfprintf(stderr, format, arg);
-          va_end(arg);
-          nl = format[strlen(format)-1] == '\n';
-     }
-     return result;
-}
-
-static int debug_logger(level_t level, char *format, ...) {
-     static bool_t nl = true;
-     int result = 0;
-     va_list arg;
-     if(level <= debug) {
-          va_start(arg, format);
-          if (nl) {
-               taglog(level);
-          }
-          result = vfprintf(stderr, format, arg);
-          va_end(arg);
-          nl = format[strlen(format)-1] == '\n';
-     }
-     return result;
-}
-
-static int trace_logger(level_t level, char *format, ...) {
-     static bool_t nl = true;
-     int result = 0;
-     va_list arg;
-     if(level <= trace) {
-          va_start(arg, format);
-          if (nl) {
-               taglog(level);
-          }
-          result = vfprintf(stderr, format, arg);
-          va_end(arg);
-          nl = format[strlen(format)-1] == '\n';
-     }
-     return result;
-}
+DEFUN_LOGGER(warn)
+DEFUN_LOGGER(info)
+DEFUN_LOGGER(debug)
+DEFUN_LOGGER(trace)
 
 logger_t get_logger(level_t level) {
+     static volatile bool_t init = false;
+     static pthread_t logger;
+
+     if (!init) {
+          init = true;
+          pthread_create(&logger, NULL, (void*(*)(void*))logger_routine, NULL);
+     }
+
      switch(level) {
      case warn:  return warn_logger;
      case info:  return info_logger;
@@ -149,17 +181,15 @@ const char *yacad_version(void) {
 
 static void *zmq_context = NULL;
 
-void *get_zmq_context(logger_t log) {
+void *get_zmq_context(void) {
      if (zmq_context == NULL) {
-          log(debug, "Creating 0MQ context\n");
           zmq_context = zmq_ctx_new();
      }
      return zmq_context;
 }
 
-void del_zmq_context(logger_t log) {
+void del_zmq_context(void) {
      if (zmq_context != NULL) {
-          log(debug, "Terminating 0MQ context\n");
           zmq_ctx_term(zmq_context);
           zmq_context = NULL;
      }

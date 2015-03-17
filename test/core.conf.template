@@ -3,8 +3,8 @@
         "level": "debug",
     },
     "core": {
-        "root_path": "#PATH#/test/projects",
-        "port": 9733,
+        "root_path": "#PATH#/test/projects", // for tests
+        "endpoint": "tcp://*:1789", // that is actually the default
     },
     "projects": [
         {

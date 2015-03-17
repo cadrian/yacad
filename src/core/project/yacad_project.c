@@ -32,9 +32,7 @@ static const char *get_name(yacad_project_impl_t *this) {
 static struct timeval next_check(yacad_project_impl_t *this) {
      struct timeval result = this->cron->next(this->cron);
      char tmbuf[20];
-     if (this->log(debug, "Project \"%s\" next check time: ", this->name) > 0) {
-          this->log(debug, "%s\n", datetime(result.tv_sec, tmbuf));
-     }
+     this->log(debug, "Project \"%s\" next check time: %s", this->name, datetime(result.tv_sec, tmbuf));
      return result;
 }
 

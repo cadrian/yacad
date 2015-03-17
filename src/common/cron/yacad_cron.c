@@ -38,12 +38,12 @@ static bool_t lookup(yacad_cron_impl_t *this, unsigned long field, int *min, int
      int i;
      bool_t result = false, done = false;
      if (ISBIT(field, *min)) {
-          this->log(trace, "lookup %s: found min %2d\n", fieldname, *min);
+          this->log(trace, "lookup %s: found min %2d", fieldname, *min);
           result = done = true;
      }
      for (i = *min + 1; !done && i < max; i++) {
           if (ISBIT(field, i)) {
-               this->log(trace, "lookup %s: found %2d\n", fieldname, i);
+               this->log(trace, "lookup %s: found %2d", fieldname, i);
                *min = i;
                done = true;
           }

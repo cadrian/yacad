@@ -29,11 +29,11 @@ typedef struct yacad_runner_s yacad_runner_t;
 
 typedef const char *(*yacad_runner_get_name_fn)(yacad_runner_t *this);
 typedef const char *(*yacad_runner_get_arch_fn)(yacad_runner_t *this);
-typedef const int(*yacad_runner_get_load_fn)(yacad_runner_t *this);
 typedef void (*yacad_runner_free_fn)(yacad_runner_t *this);
 
 struct yacad_runner_s {
      yacad_runner_get_name_fn get_name;
+     yacad_runner_get_arch_fn get_arch;
      yacad_runner_free_fn free;
 };
 

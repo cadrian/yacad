@@ -18,18 +18,21 @@
 #include "scheduler/yacad_scheduler.h"
 
 int main(int argc, const char * const *argv) {
-     yacad_conf_t *conf = yacad_conf_new();
+     yacad_conf_t *conf;
      yacad_scheduler_t *scheduler;
 
-     conf->log(info, "yaCAD core version %s - READY\n", yacad_version());
-     get_zmq_context(conf->log);
+     get_zmq_context();
+
+     conf = yacad_conf_new();
+     conf->log(info, "yaCAD core version %s - READY", yacad_version());
 
      scheduler = yacad_scheduler_new(conf);
      scheduler->run(scheduler);
 
-     del_zmq_context(conf->log);
      scheduler->free(scheduler);
      conf->free(conf);
+
+     del_zmq_context();
 
      return 0;
 }

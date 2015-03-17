@@ -64,13 +64,13 @@ static void worker_next_check(yacad_scheduler_impl_t *this) {
      this->worker_next_check.time = tmzero;
      projects->iterate(projects, (cad_hash_iterator_fn)iterate_next_check, this);
 
-     if (timercmp(&save_tm, &(this->worker_next_check.time), !=) && this->conf->log(debug, "Next check time: ") > 0) {
-          this->conf->log(debug, "%s\n", datetime(this->worker_next_check.time.tv_sec, tmbuf));
+     if (timercmp(&save_tm, &(this->worker_next_check.time), !=)) {
+          this->conf->log(debug, "Next check time: %s", datetime(this->worker_next_check.time.tv_sec, tmbuf));
      }
 }
 
 static void *worker_routine(yacad_scheduler_impl_t *this) {
-     void *zcontext = get_zmq_context(this->conf->log);
+     void *zcontext = get_zmq_context();
      void *zscheduler = zmq_socket(zcontext, ZMQ_PAIR);
      int confgen;
      bool_t running = false;
@@ -119,24 +119,35 @@ static void iterate_check_project(cad_hash_t *projects, int index, const char *p
 }
 
 static void run(yacad_scheduler_impl_t *this) {
-     void *zcontext = get_zmq_context(this->conf->log);
+     void *zcontext = get_zmq_context();
      void *zworker = zmq_socket(zcontext, ZMQ_PAIR);
+     void *zrunner = zmq_socket(zcontext, ZMQ_REP);
      bool_t done = false;
      int i;
      char buffer[16];
      size_t n = sizeof(buffer);
      cad_hash_t *projects;
+     zmq_pollitem_t zitems[] = {
+          {zworker, 0, ZMQ_POLLIN, 0},
+          {zrunner, 0, ZMQ_POLLIN, 0},
+     };
 
      zmq_bind(zworker, INPROC_ADDRESS); // TODO error checking
 
      zmq_send(zworker, MSG_START, strlen(MSG_START), 0); // TODO error checking
 
      do {
-          i = zmq_recv(zworker, buffer, n, 0); // TODO error checking
-          if (!strncmp(buffer, MSG_CHECK, i)) {
-               this->conf->log(debug, "Checking projects\n");
-               projects = this->conf->get_projects(this->conf);
-               projects->iterate(projects, (cad_hash_iterator_fn)iterate_check_project, this);
+          zmq_poll(zitems, 2, -1);
+          if (zitems[0].revents & ZMQ_POLLIN) {
+               i = zmq_recv(zworker, buffer, n, 0); // TODO error checking
+               if (!strncmp(buffer, MSG_CHECK, i)) {
+                    this->conf->log(debug, "Checking projects");
+                    projects = this->conf->get_projects(this->conf);
+                    projects->iterate(projects, (cad_hash_iterator_fn)iterate_check_project, this);
+               }
+          } else if (zitems[1].revents & ZMQ_POLLIN) {
+               i = zmq_recv(zrunner, buffer, n, 0); // TODO error checking
+               // TODO send a task according to the runner description
           }
      } while (!done);
 
