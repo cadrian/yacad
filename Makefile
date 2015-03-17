@@ -121,9 +121,9 @@ target/dpkg/release.main: exe target/version
 	mv ../$(PROJECT)_$(shell cat target/version)_*.build   target/dpkg/
 	mv ../$(PROJECT)_$(shell cat target/version)_*.changes target/dpkg/
 ifeq "$(wildcard /usr/bin/doxygen)" ""
-	(cd target && tar cfz $(PROJECT)_$(shell cat target/version)_$(shell gcc -v 2>&1 | grep '^Target:' | sed 's/^Target: //').tgz $(PROJECT) dpkg)
+	(cd target && tar cfz $(PROJECT)_$(shell cat target/version)_$(shell gcc -v 2>&1 | grep '^Target:' | sed 's/^Target: //').tgz $(PROJECT)_core dpkg)
 else
-	(cd target && tar cfz $(PROJECT)_$(shell cat target/version)_$(shell gcc -v 2>&1 | grep '^Target:' | sed 's/^Target: //').tgz $(PROJECT) $(PROJECT).pdf $(PROJECT)-htmldoc.tgz dpkg)
+	(cd target && tar cfz $(PROJECT)_$(shell cat target/version)_$(shell gcc -v 2>&1 | grep '^Target:' | sed 's/^Target: //').tgz $(PROJECT)_core $(PROJECT).pdf $(PROJECT)-htmldoc.tgz dpkg)
 endif
 	touch target/dpkg/release.main
 
