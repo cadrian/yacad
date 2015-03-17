@@ -19,18 +19,17 @@
 
 #include "yacad.h"
 #include "core/conf/yacad_conf.h"
-#include "yacad_events.h"
 
 typedef struct yacad_scheduler_s yacad_scheduler_t;
 
 typedef bool_t (*yacad_scheduler_is_done_fn)(yacad_scheduler_t *this);
-typedef void (*yacad_scheduler_prepare_fn)(yacad_scheduler_t *this, yacad_events_t *events);
+typedef void (*yacad_scheduler_run_fn)(yacad_scheduler_t *this);
 typedef void (*yacad_scheduler_stop_fn)(yacad_scheduler_t *this);
 typedef void (*yacad_scheduler_free_fn)(yacad_scheduler_t *this);
 
 struct yacad_scheduler_s {
      yacad_scheduler_is_done_fn is_done;
-     yacad_scheduler_prepare_fn prepare;
+     yacad_scheduler_run_fn run;
      yacad_scheduler_stop_fn stop;
      yacad_scheduler_free_fn free;
 };

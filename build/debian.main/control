@@ -2,7 +2,7 @@ Source: yacad
 Section: admin
 Priority: optional
 Maintainer: Cyril Adrian <cyril.adrian@gmail.com>
-Build-Depends: debhelper (>= 9), libcad-dev, libyacjp-dev, libsqlite3-dev
+Build-Depends: debhelper (>= 9), libcad-dev, libyacjp-dev, libsqlite3-dev, libzmq3-dev (>= 4.0.5)
 Build-Depends-Indep: doxygen, texlive-fonts-extra
 Standards-Version: 3.9.5
 Homepage: https://github.com/cadrian/yacad
@@ -11,7 +11,7 @@ Vcs-Browser: https://github.com/cadrian/yacad
 
 Package: yacad-core
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libcad0, libyacjp0, libsqlite3-0
+Depends: ${shlibs:Depends}, ${misc:Depends}, libcad0, libyacjp0, libsqlite3-0, libzmq3 (>= 4.0.5)
 Description: yet another Continuous Automation Design
  A light-weight continuous integration system.
  .
@@ -19,7 +19,7 @@ Description: yet another Continuous Automation Design
 
 Package: yacad-runner
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libcad0, libyacjp0
+Depends: ${shlibs:Depends}, ${misc:Depends}, libcad0, libyacjp0, libzmq3 (>= 4.0.5)
 Description: yet another Continuous Automation Design
  A light-weight continuous integration system.
  .

@@ -52,7 +52,7 @@ exe: target/$(PROJECT)_core
 
 target/$(PROJECT)_core: $(COMMON_OBJ) $(CORE_OBJ) $(LIBCAD) $(LIBYACJP)
 	@echo "Compiling executable: $@"
-	$(CC) $(CFLAGS) -o $@ $(COMMON_OBJ) $(CORE_OBJ) -Wall -Werror -L target -lcad -lyacjp -lm -lgit2 -lsqlite3
+	$(CC) $(CFLAGS) -o $@ $(COMMON_OBJ) $(CORE_OBJ) -Wall -Werror -L target -lcad -lyacjp -lm -lgit2 -lsqlite3 -lzmq -lpthread
 
 target/out/%.o: src/%.c src/*.h Makefile
 	mkdir -p $(shell dirname $@)

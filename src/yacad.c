@@ -146,3 +146,21 @@ const char *yacad_version(void) {
      }
      return version;
 }
+
+static void *zmq_context = NULL;
+
+void *get_zmq_context(logger_t log) {
+     if (zmq_context == NULL) {
+          log(debug, "Creating 0MQ context\n");
+          zmq_context = zmq_ctx_new();
+     }
+     return zmq_context;
+}
+
+void del_zmq_context(logger_t log) {
+     if (zmq_context != NULL) {
+          log(debug, "Terminating 0MQ context\n");
+          zmq_ctx_term(zmq_context);
+          zmq_context = NULL;
+     }
+}

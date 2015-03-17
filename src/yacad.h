@@ -20,12 +20,14 @@
 #include <alloca.h>
 #include <errno.h>
 #include <libgen.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <zmq.h>
 
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -33,8 +35,6 @@
 #include <sys/wait.h>
 
 #include <cad_array.h>
-#include <cad_event_queue.h>
-#include <cad_events.h>
 #include <cad_hash.h>
 #include <cad_shared.h>
 
@@ -94,5 +94,8 @@ const char *datetime(time_t t, char *tmbuf);
 int mkpath(const char *dir, mode_t mode);
 
 logger_t get_logger(level_t level);
+
+void *get_zmq_context(logger_t log);
+void del_zmq_context(logger_t log);
 
 #endif /* __YACAD_H__ */

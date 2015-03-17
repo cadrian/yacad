@@ -16,23 +16,20 @@
 
 #include "conf/yacad_conf.h"
 #include "scheduler/yacad_scheduler.h"
-#include "scheduler/yacad_events.h"
 
 int main(int argc, const char * const *argv) {
      yacad_conf_t *conf = yacad_conf_new();
-     yacad_events_t *events = yacad_events_new();
-     yacad_scheduler_t *scheduler = yacad_scheduler_new(conf);
-     bool_t done = false;
+     yacad_scheduler_t *scheduler;
 
      conf->log(info, "yaCAD core version %s - READY\n", yacad_version());
+     get_zmq_context(conf->log);
 
-     do {
-          scheduler->prepare(scheduler, events);
-          done = !events->step(events);
-     } while (!done);
+     scheduler = yacad_scheduler_new(conf);
+     scheduler->run(scheduler);
 
+     del_zmq_context(conf->log);
      scheduler->free(scheduler);
-     events->free(events);
      conf->free(conf);
+
      return 0;
 }
