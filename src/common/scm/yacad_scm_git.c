@@ -80,9 +80,7 @@ static bool_t __gitcheck(logger_t log, int giterr, level_t level, const char *gi
 
 #define gitcheck(log, gitaction, level) __gitcheck(log, (gitaction), (level), #gitaction, __LINE__)
 
-static yacad_task_t *build_task(yacad_scm_git_t *this){
-     yacad_task_t *result = NULL;
-     cad_hash_t *env = cad_new_hash(stdlib_memory, cad_hash_strings);
+static void fill_env(yacad_scm_git_t *this, cad_hash_t *env){
      const git_remote_head **heads;
      git_buf branch = {NULL,0,0};
      size_t szheads = 0;
@@ -94,18 +92,14 @@ static yacad_task_t *build_task(yacad_scm_git_t *this){
      }
      gitcheck(this->log, git_remote_default_branch(&branch, this->remote), warn);
 
-     env->set(env, "ref", ref);
-     env->set(env, "branch", branch.ptr);
+     env->set(env, "ref", strdup(ref));
+     env->set(env, "branch", strdup(branch.ptr));
 
-     result = yacad_task_new(this->log, this->desc, env);
-
-     env->free(env);
      free(branch.ptr);
-     return result;
 }
 
-static yacad_task_t *check(yacad_scm_git_t *this) {
-     yacad_task_t *result = NULL;
+static bool_t check(yacad_scm_git_t *this) {
+     bool_t result = false;
      bool_t downloaded;
 
      if (!gitcheck(this->log, git_remote_connect(this->remote, GIT_DIRECTION_FETCH), warn)) {
@@ -123,7 +117,7 @@ static yacad_task_t *check(yacad_scm_git_t *this) {
                     this->log(warn, "Download incomplete: network %3d%%  /  indexing %3d%%", this->fetch_percent, this->index_percent);
                } else {
                     this->log(info, "Remote needs building: %s", this->upstream_url);
-                    result = build_task(this);
+                    result = true;
                }
           }
      }
@@ -168,8 +162,9 @@ static int yacad_git_credentials(git_cred **out, const char *url, const char *us
 }
 
 static yacad_scm_t git_fn = {
-     (yacad_scm_check_fn) check,
-     (yacad_scm_free_fn) free_,
+     .check = (yacad_scm_check_fn)check,
+     .fill_env = (yacad_scm_fill_env_fn)fill_env,
+     .free = (yacad_scm_free_fn)free_,
 };
 
 yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_value_t *desc) {

@@ -21,6 +21,7 @@
 
 #include "yacad.h"
 #include "common/cron/yacad_cron.h"
+#include "common/scm/yacad_scm.h"
 #include "common/task/yacad_task.h"
 
 typedef struct yacad_project_s yacad_project_t;
@@ -28,17 +29,19 @@ typedef struct yacad_project_s yacad_project_t;
 typedef const char *(*yacad_project_get_name_fn)(yacad_project_t *this);
 typedef struct timeval (*yacad_project_next_check_fn)(yacad_project_t *this);
 typedef yacad_task_t *(*yacad_project_check_fn)(yacad_project_t *this);
-typedef json_array_t *(*yacad_get_actions_fn)(yacad_project_t *this);
+typedef void (*yacad_project_next_task_fn)(yacad_project_t *this);
+typedef bool_t (*yacad_project_is_done_fn)(yacad_project_t *this);
 typedef void (*yacad_project_free_fn)(yacad_project_t *this);
 
 struct yacad_project_s {
      yacad_project_get_name_fn get_name;
      yacad_project_next_check_fn next_check;
      yacad_project_check_fn check;
-     yacad_get_actions_fn get_actions;
+     yacad_project_next_task_fn next_task;
+     yacad_project_is_done_fn is_done;
      yacad_project_free_fn free;
 };
 
-yacad_project_t *yacad_project_new(logger_t log, const char *name, yacad_cron_t *cron, json_array_t *actions);
+yacad_project_t *yacad_project_new(logger_t log, const char *name, const char *root_path, yacad_cron_t *cron, yacad_scm_t *scm, json_array_t *actions);
 
 #endif /* __YACAD_PROJECT_H__ */

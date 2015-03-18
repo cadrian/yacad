@@ -263,7 +263,7 @@ static void read_projects(yacad_conf_impl_t *this) {
                               I(this)->log(warn, "Project \"%s\": invalid cron", name);
                               scm->free(scm);
                          } else {
-                              project = yacad_project_new(I(this)->log, name, scm, cron, jrunner);
+                              project = yacad_project_new(I(this)->log, name, this->root_path, scm, cron, jrunner);
                               if (project == NULL) {
                                    cron->free(cron);
                                    scm->free(scm);

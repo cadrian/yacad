@@ -9,11 +9,14 @@
     "projects": [
         {
             "name": "test",
-            "actions": [
+            "scm": {
+                "type": "git", // will checkout from repository
+                "upstream_url": "file://#PATH#/.git",
+            },
+            "tasks": [
                 {
-                    "scm": {
-                        "type": "git", // will checkout from repository
-                        "upstream_url": "file://#PATH#/.git",
+                    "source": {
+                        "type": "scm", // will checkout from repository
                         "branch": "${branch}",
                         "ref": "${ref}",
                     },
@@ -27,7 +30,7 @@
                     },
                 },
                 {
-                    "scm": {
+                    "source": {
                         "type": "debian", // will reuse debian artifacts
                     },
                     "runner": {

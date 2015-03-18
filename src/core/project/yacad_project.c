@@ -20,8 +20,12 @@ typedef struct yacad_project_impl_s {
      yacad_project_t fn;
      logger_t log;
      yacad_cron_t *cron;
-     json_array_t *actions;
-     char name[0];
+     json_array_t *tasks;
+     int taskindex;
+     yacad_scm_t *scm;
+     char *name;
+     char *root_path;
+     char _[0];
 } yacad_project_impl_t;
 
 static const char *get_name(yacad_project_impl_t *this) {
@@ -35,12 +39,28 @@ static struct timeval next_check(yacad_project_impl_t *this) {
      return result;
 }
 
-static yacad_task_t *check(yacad_project_impl_t *this) {
-     return this->scm->check(this->scm);
+static void env_cleaner(cad_hash_t *env, int index, const char *key, char *value, yacad_project_impl_t *this) {
+     free(value);
 }
 
-static json_array_t *get_actions(yacad_project_impl_t *this) {
-     return this->actions;
+static yacad_task_t *check(yacad_project_impl_t *this) {
+     yacad_task_t *result = NULL;
+     cad_hash_t *env = cad_new_hash(stdlib_memory, cad_hash_strings);
+     if (this->scm->check(this->scm)) {
+          this->scm->fill_env(this->scm, env);
+          result = yacad_task_new(this->log, this->tasks->get(this->tasks, this->taskindex), this->env, this->root_path);
+     }
+     env->clean(env, (cad_hash_iterator_fn)env_cleaner, this);
+     env->free(env);
+     return result;
+}
+
+static void next_task(yacad_project_impl_t *this) {
+     this->taskindex++;
+}
+
+static bool_t is_done(yacad_project_impl_t *this) {
+     this->taskindex >= this->tasks->count(this->tasks);
 }
 
 static void free_(yacad_project_impl_t *this) {
@@ -52,16 +72,24 @@ static yacad_project_t impl_fn = {
      .get_name = (yacad_project_get_name_fn) get_name,
      .next_check = (yacad_project_next_check_fn) next_check,
      .check = (yacad_project_check_fn) check,
-     .get_actions = (yacad_get_actions_fn)get_actions,
+     .next_task = (yacad_project_next_tasl_fn)next_task,
+     .is_done = (yacad_project_is_done_fn)is_done,
      .free = (yacad_project_free_fn) free_,
 };
 
-yacad_project_t *yacad_project_new(logger_t log, const char *name, yacad_cron_t *cron, json_array_t *actions) {
-     yacad_project_impl_t *result = malloc(sizeof(yacad_project_impl_t) + strlen(name) + 1);
+yacad_project_t *yacad_project_new(logger_t log, const char *name, const char *root_path, yacad_cron_t *cron, yacad_scm_t *scm, json_array_t *tasks) {
+     size_t szname = strlen(name) + 1;
+     size_t szroot_path = strlen(root_path) + 1;
+     yacad_project_impl_t *result = malloc(sizeof(yacad_project_impl_t) + szname + szroot_path);
      result->fn = impl_fn;
      result->log = log;
+     result->name = result->_;
      strcpy(result->name, name);
+     result->root_path = result->_ + szname;
+     strcpy(result->root_path, root_path);
      result->cron = cron;
-     result->actions = actions;
+     result->tasks = tasks;
+     result->taskindex = 0;
+     result->scm = scm;
      return I(result);
 }
