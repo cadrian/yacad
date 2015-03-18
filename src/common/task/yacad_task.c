@@ -25,6 +25,8 @@ typedef struct yacad_task_impl_s {
      time_t timestamp;
      yacad_task_status_t status;
      json_value_t *desc;
+     yacad_runnerid_t *runnerid;
+     int actionindex;
 } yacad_task_impl_t;
 
 static unsigned long get_id(yacad_task_impl_t *this) {
@@ -47,9 +49,22 @@ static void set_status(yacad_task_impl_t *this, yacad_task_status_t status) {
      this->status = status;
 }
 
+static yacad_runnerid_t *get_runnerid(yacad_task_impl_t *this) {
+     return this->runnerid;
+}
+
+static int get_actionindex(yacad_task_impl_t *this) {
+     return this->actionindex;
+}
+
+static void set_actionindex(yacad_task_impl_t *this, int actionindex) {
+     this->actionindex = actionindex;
+}
+
 static bool_t same_as(yacad_task_impl_t *this, yacad_task_impl_t *other) {
      bool_t result = false;
      static yacad_json_compare_t *cmp = NULL;
+
      if (this->desc == NULL) {
           result = other->desc == NULL;
      } else if (other->desc != NULL) {
@@ -57,6 +72,12 @@ static bool_t same_as(yacad_task_impl_t *this, yacad_task_impl_t *other) {
                cmp = yacad_json_compare_new(this->log);
           }
           result = cmp->equal(cmp, this->desc, other->desc);
+     }
+     if (result)  {
+          result = this->actionindex = other->actionindex;
+          if (result) {
+               result = this->runnerid->same_as(this->runnerid, other->runnerid);
+          }
      }
      return result;
 }
@@ -90,6 +111,7 @@ static const char *serialize(yacad_task_impl_t *this) {
 }
 
 static void free_(yacad_task_impl_t *this) {
+     this->runnerid->free(this->runnerid);
      this->desc->free(this->desc);
      free(this);
 }
@@ -100,14 +122,17 @@ static yacad_task_t impl_fn = {
      .get_timestamp = (yacad_task_get_timestamp_fn)get_timestamp,
      .get_status = (yacad_task_get_status_fn)get_status,
      .set_status = (yacad_task_set_status_fn)set_status,
+     .get_runnerid = (yacad_task_get_runnerid_fn)get_runnerid,
+     .get_actionindex = (yacad_task_get_actionindex_fn)get_actionindex,
+     .set_actionindex = (yacad_task_set_actionindex_fn)set_actionindex,
      .serialize = (yacad_task_serialize_fn)serialize,
      .same_as = (yacad_task_same_as_fn)same_as,
      .free = (yacad_task_free_fn)free_,
 };
 
-yacad_task_t *yacad_task_unserialize(logger_t log, unsigned long id, time_t timestamp, yacad_task_status_t status, char *serial) {
+yacad_task_t *yacad_task_unserialize(logger_t log, unsigned long id, time_t timestamp, yacad_task_status_t status, char *serial_desc, yacad_runnerid_t *runnerid, int actionindex) {
      yacad_task_impl_t *result = NULL;
-     json_input_stream_t *in = new_json_input_stream_from_string(serial, stdlib_memory);
+     json_input_stream_t *in = new_json_input_stream_from_string(serial_desc, stdlib_memory);
      json_value_t *desc = json_parse(in, NULL, stdlib_memory);
      in->free(in);
 
@@ -119,11 +144,13 @@ yacad_task_t *yacad_task_unserialize(logger_t log, unsigned long id, time_t time
           result->timestamp = timestamp;
           result->status = status;
           result->desc = desc;
+          result->runnerid = runnerid;
+          result->actionindex = actionindex;
      }
      return I(result);
 }
 
-yacad_task_t *yacad_task_new(logger_t log, json_value_t *desc, cad_hash_t *env) {
+yacad_task_t *yacad_task_new(logger_t log, json_value_t *desc, yacad_runnerid_t *runnerid, cad_hash_t *env, int actionindex) {
      yacad_task_impl_t *result = malloc(sizeof(yacad_task_impl_t));
      yacad_json_template_t *template;
      result->fn = impl_fn;
@@ -138,5 +165,7 @@ yacad_task_t *yacad_task_new(logger_t log, json_value_t *desc, cad_hash_t *env) 
           result->desc = template->resolve(template, desc);
           I(template)->free(I(template));
      }
+     result->runnerid = runnerid;
+     result->actionindex = actionindex;
      return I(result);
 }

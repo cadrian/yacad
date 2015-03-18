@@ -9,25 +9,37 @@
     "projects": [
         {
             "name": "test",
-            "runner": {
-                "arch": "foo",
-            },
-            "scm": {
-                "type": "git",
-                "upstream_url": "file://#PATH#/.git",
-                "actions": [
-                    {
-                        "type": "checkout",
+            "actions": [
+                {
+                    "scm": {
+                        "type": "git", // will checkout from repository
+                        "upstream_url": "file://#PATH#/.git",
                         "branch": "${branch}",
                         "ref": "${ref}",
                     },
-                    {
+                    "runner": {
+                        "arch": "foo",
+                    },
+                    "action": {
                         "type": "spawn",
                         "command": "make clean; build/build.sh main",
                         "artifacts": "target/dpkg/*.deb target/dpkg/*.dsc target/dpkg/*.tar.gz target/dpkg/*.changes",
                     },
-                ],
-            },
+                },
+                {
+                    "scm": {
+                        "type": "debian", // will reuse debian artifacts
+                    },
+                    "runner": {
+                        "arch": "bar",
+                    },
+                    "action": {
+                        "type": "spawn",
+                        "command": "make clean; build/build.sh main",
+                        "artifacts": "target/dpkg/*.deb target/dpkg/*.dsc target/dpkg/*.tar.gz target/dpkg/*.changes",
+                    },
+                },
+            ],
             "cron": "* * * * *",
         },
     ],

@@ -22,11 +22,13 @@
      "ID integer primary key asc autoincrement, "        \
      "TIMESTAMP integer not null, "                      \
      "STATUS integer not null, "                         \
-     "SER not null"                                      \
+     "DESC not null,"                                    \
+     "RUNNERID not null,"                                \
+     "ACTIONINDEX integer not null"                      \
      ")"
 
-#define STMT_SELECT "select ID, TIMESTAMP, STATUS, SER from TASKLIST where STATUS=? order by ID asc"
-#define STMT_INSERT "insert into TASKLIST (TIMESTAMP, STATUS, SER) values (?,?,?)"
+#define STMT_SELECT "select ID, TIMESTAMP, STATUS, DESC, RUNNERID, ACTIONINDEX from TASKLIST where STATUS=? order by ID asc"
+#define STMT_INSERT "insert into TASKLIST (TIMESTAMP, STATUS, DESC, RUNNERID, ACTIONINDEX) values (?,?,?,?,?)"
 #define STMT_UPDATE "update TASKLIST set STATUS=? where ID = ?"
 
 typedef struct yacad_tasklist_impl_s {
@@ -63,9 +65,12 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
      bool_t found = false;
      yacad_task_t *other;
      sqlite3_stmt *query = NULL;
-     const char *ser = task->serialize(task);
+     yacad_runnerid_t *runnerid = task->get_runnerid(task);
+     const char *desc = task->serialize(task);
+     const char *rid = runnerid->serialize(runnerid);
      time_t timestamp = task->get_timestamp(task);
      yacad_task_status_t status = task->get_status(task);
+     int actionindex = task->get_actionindex(task);
 
      n = this->tasklist->count(this->tasklist);
      for (i = 0; !found && i < n; i++) {
@@ -73,30 +78,44 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
           found = task->same_as(task, other);
      }
      if (found) {
-          this->log(debug, "Task not added: %s", ser);
+          this->log(debug, "Task not added: %s", desc);
           task->free(task);
      } else {
           if (sqlcheck(this->db, this->log, sqlite3_prepare_v2(this->db, STMT_INSERT, -1, &query, NULL), warn)) {
                sqlcheck(this->db, this->log, sqlite3_bind_int64(query, 1, (sqlite3_int64)timestamp), warn);
                sqlcheck(this->db, this->log, sqlite3_bind_int(query, 2, (int)status), warn);
-               sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 3, ser, strlen(ser), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
+               sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 3, desc, strlen(desc), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
+               sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 4, rid, strlen(rid), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
+               sqlcheck(this->db, this->log, sqlite3_bind_int(query, 5, actionindex), warn);
                sqlite3_step(query);
                task->set_id(task, (unsigned long)sqlite3_last_insert_rowid(this->db));
                sqlcheck(this->db, this->log, sqlite3_finalize(query), warn);
           }
 
-          ser = task->serialize(task);
-          this->log(info, "Added task: %s", ser);
+          desc = task->serialize(task);
+          this->log(info, "Added task: %s", desc);
           this->tasklist->insert(this->tasklist, n, &task);
      }
 }
 
 static yacad_task_t *get(yacad_tasklist_impl_t *this, yacad_runnerid_t *runnerid) {
-     yacad_task_t *result = NULL;
-     int index = 0; // TODO find the best matching index
-     result = *(yacad_task_t **)this->tasklist->get(this->tasklist, index);
-     this->tasklist->del(this->tasklist, index);
-     // TODO save to database // NO!! do that only when the task is successfully performed (we need an extra method here)
+     yacad_task_t *result = NULL, *task;
+     unsigned int best_index, index, count = this->tasklist->count(this->tasklist);
+     int best_match = -1, match;
+     yacad_runnerid_t *task_runnerid;
+     for (index = 0; result == NULL && index < count; index++) {
+          task = *(yacad_task_t **)this->tasklist->get(this->tasklist, index);
+          task_runnerid = task->get_runnerid(task);
+          match = runnerid->match(runnerid, task_runnerid);
+          if (match > best_match) {
+               best_match = match;
+               best_index = index;
+          }
+     }
+     if (best_match >= 0) {
+          result = *(yacad_task_t **)this->tasklist->get(this->tasklist, best_index);
+          this->tasklist->del(this->tasklist, best_index);
+     }
      return result;
 }
 
@@ -120,10 +139,11 @@ static yacad_tasklist_t impl_fn = {
      .free = (yacad_tasklist_free_fn)free_,
 };
 
-static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, sqlite3_int64 sql_timestamp, int sql_status, const unsigned char *sql_desc) {
-     yacad_task_t *task = yacad_task_unserialize(this->log, (unsigned long)sql_id, (time_t)sql_timestamp, (yacad_task_status_t)sql_status, (char*)sql_desc);
+static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, sqlite3_int64 sql_timestamp, int sql_status, const unsigned char *sql_desc, const unsigned char *sql_runnerid, int actionindex) {
+     yacad_runnerid_t *runnerid = yacad_runnerid_unserialize(this->log, (char*)sql_runnerid);
+     yacad_task_t *task = yacad_task_unserialize(this->log, (unsigned long)sql_id, (time_t)sql_timestamp, (yacad_task_status_t)sql_status, (char*)sql_desc, runnerid, actionindex);
      this->tasklist->insert(this->tasklist, this->tasklist->count(this->tasklist), &task);
-     this->log(info, "Restored task: %s", task->serialize(task));
+     this->log(info, "Restored task: %s [runnerid %s]", sql_desc, sql_runnerid);
 }
 
 yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
@@ -178,7 +198,9 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
                              sqlite3_column_int64(query, 0),
                              sqlite3_column_int64(query, 1),
                              sqlite3_column_int(query, 2),
-                             sqlite3_column_text(query, 3));
+                             sqlite3_column_text(query, 3),
+                             sqlite3_column_text(query, 4),
+                             sqlite3_column_int(query, 5));
                     break;
                default:
                     sqlcheck(db, log, err, warn);

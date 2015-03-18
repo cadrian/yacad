@@ -27,14 +27,21 @@ typedef struct yacad_runnerid_s yacad_runnerid_t;
 
 typedef const char *(*yacad_runnerid_get_name_fn)(yacad_runnerid_t *this);
 typedef const char *(*yacad_runnerid_get_arch_fn)(yacad_runnerid_t *this);
+typedef const char *(*yacad_runnerid_serialize_fn)(yacad_runnerid_t *this);
+typedef bool_t (*yacad_runnerid_same_as_fn)(yacad_runnerid_t *this, yacad_runnerid_t *other);
+typedef int (*yacad_runnerid_match_fn)(yacad_runnerid_t *this, yacad_runnerid_t *other);
 typedef void (*yacad_runnerid_free_fn)(yacad_runnerid_t *this);
 
 struct yacad_runnerid_s {
      yacad_runnerid_get_name_fn get_name;
      yacad_runnerid_get_arch_fn get_arch;
+     yacad_runnerid_serialize_fn serialize;
+     yacad_runnerid_same_as_fn same_as;
+     yacad_runnerid_match_fn match;
      yacad_runnerid_free_fn free;
 };
 
+yacad_runnerid_t *yacad_runnerid_unserialize(logger_t log, char *serial);
 yacad_runnerid_t *yacad_runnerid_new(logger_t log, json_value_t *desc);
 
 #endif /* __YACAD_RUNNERID_H__ */
