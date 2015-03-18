@@ -19,9 +19,8 @@
 typedef struct yacad_project_impl_s {
      yacad_project_t fn;
      logger_t log;
-     yacad_scm_t *scm;
      yacad_cron_t *cron;
-     json_object_t *runner_criteria;
+     json_array_t *actions;
      char name[0];
 } yacad_project_impl_t;
 
@@ -40,12 +39,11 @@ static yacad_task_t *check(yacad_project_impl_t *this) {
      return this->scm->check(this->scm);
 }
 
-static json_object_t *get_runner_criteria(yacad_project_impl_t *this) {
-     return this->runner_criteria;
+static json_array_t *get_actions(yacad_project_impl_t *this) {
+     return this->actions;
 }
 
 static void free_(yacad_project_impl_t *this) {
-     this->scm->free(this->scm);
      this->cron->free(this->cron);
      free(this);
 }
@@ -54,17 +52,16 @@ static yacad_project_t impl_fn = {
      .get_name = (yacad_project_get_name_fn) get_name,
      .next_check = (yacad_project_next_check_fn) next_check,
      .check = (yacad_project_check_fn) check,
-     .get_runner_criteria = (yacad_get_runner_criteria_fn)get_runner_criteria,
+     .get_actions = (yacad_get_actions_fn)get_actions,
      .free = (yacad_project_free_fn) free_,
 };
 
-yacad_project_t *yacad_project_new(logger_t log, const char *name, yacad_scm_t *scm, yacad_cron_t *cron, json_object_t *runner_criteria) {
+yacad_project_t *yacad_project_new(logger_t log, const char *name, yacad_cron_t *cron, json_array_t *actions) {
      yacad_project_impl_t *result = malloc(sizeof(yacad_project_impl_t) + strlen(name) + 1);
      result->fn = impl_fn;
      result->log = log;
      strcpy(result->name, name);
-     result->scm = scm;
      result->cron = cron;
-     result->runner_criteria = runner_criteria;
+     result->actions = actions;
      return I(result);
 }

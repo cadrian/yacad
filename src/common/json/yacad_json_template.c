@@ -73,8 +73,12 @@ static void visit_array(yacad_json_template_impl_t *this, json_array_t *visited)
 }
 
 static char *template_getenv(yacad_json_template_impl_t *this, const char *key, size_t szkey) {
-     char *k = strndupa(key, szkey);
-     return this->env->get(this->env, k);
+     char *result = NULL, *k;
+     if (this->env != NULL) {
+          k = strndupa(key, szkey);
+          result = this->env->get(this->env, k);
+     }
+     return result;
 }
 
 static void visit_string(yacad_json_template_impl_t *this, json_string_t *visited) {
@@ -125,11 +129,18 @@ static void visit_string(yacad_json_template_impl_t *this, json_string_t *visite
 }
 
 static void visit_number(yacad_json_template_impl_t *this, json_number_t *visited) {
-     this->result.number = visited;
+     int n = visited->to_string(visited, "", 0) + 1;
+     json_input_stream_t *in;
+     char *buffer = alloca(n);
+     visited->to_string(visited, buffer, n);
+
+     in = new_json_input_stream_from_string(buffer, stdlib_memory);
+     this->result.value = json_parse(in, NULL, stdlib_memory);
+     in->free(in);
 }
 
 static void visit_const(yacad_json_template_impl_t *this, json_const_t *visited) {
-     this->result.constant = visited;
+     this->result.constant = json_const(visited->value(visited));
 }
 
 static json_value_t *resolve(yacad_json_template_impl_t *this, json_value_t *template) {

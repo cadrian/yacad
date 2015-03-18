@@ -20,7 +20,7 @@
                     "runner": {
                         "arch": "foo",
                     },
-                    "action": {
+                    "run": {
                         "type": "spawn",
                         "command": "make clean; build/build.sh main",
                         "artifacts": "target/dpkg/*.deb target/dpkg/*.dsc target/dpkg/*.tar.gz target/dpkg/*.changes",
@@ -33,7 +33,7 @@
                     "runner": {
                         "arch": "bar",
                     },
-                    "action": {
+                    "run": {
                         "type": "spawn",
                         "command": "make clean; build/build.sh main",
                         "artifacts": "target/dpkg/*.deb target/dpkg/*.dsc target/dpkg/*.tar.gz target/dpkg/*.changes",

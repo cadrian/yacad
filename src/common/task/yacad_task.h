@@ -19,6 +19,7 @@
 
 #include "yacad.h"
 #include "common/runnerid/yacad_runnerid.h"
+#include "common/scm/yacad_scm.h"
 
 typedef struct yacad_task_s yacad_task_t;
 
@@ -33,10 +34,9 @@ typedef void (*yacad_task_set_id_fn)(yacad_task_t *this, unsigned long id);
 typedef time_t (*yacad_task_get_timestamp_fn)(yacad_task_t *this);
 typedef yacad_task_status_t (*yacad_task_get_status_fn)(yacad_task_t *this);
 typedef void (*yacad_task_set_status_fn)(yacad_task_t *this, yacad_task_status_t status);
+typedef yacad_scm_t *(*yacad_task_get_scm_fn)(yacad_task_t *this);
+typedef json_object_t *(*yacad_task_get_run_fn)(yacad_task_t *this);
 typedef yacad_runnerid_t *(*yacad_task_get_runnerid_fn)(yacad_task_t *this);
-typedef int (*yacad_task_get_actionindex_fn)(yacad_task_t *this);
-typedef void (*yacad_task_set_actionindex_fn)(yacad_task_t *this, int actionindex);
-typedef const char *(*yacad_task_serialize_fn)(yacad_task_t *this);
 typedef bool_t (*yacad_task_same_as_fn)(yacad_task_t *this, yacad_task_t *other);
 typedef void (*yacad_task_free_fn)(yacad_task_t *this);
 
@@ -46,15 +46,14 @@ struct yacad_task_s {
      yacad_task_get_timestamp_fn get_timestamp;
      yacad_task_get_status_fn get_status;
      yacad_task_set_status_fn set_status;
+     yacad_task_get_scm_fn get_scm;
+     yacad_task_get_run_fn get_run;
      yacad_task_get_runnerid_fn get_runnerid;
-     yacad_task_get_actionindex_fn get_actionindex;
-     yacad_task_set_actionindex_fn set_actionindex;
-     yacad_task_serialize_fn serialize;
      yacad_task_same_as_fn same_as;
      yacad_task_free_fn free;
 };
 
-yacad_task_t *yacad_task_unserialize(logger_t log, unsigned long id, time_t timestamp, yacad_task_status_t status, char *serial_desc, yacad_runnerid_t *runnerid, int actionindex);
-yacad_task_t *yacad_task_new(logger_t log, json_value_t *desc, yacad_runnerid_t *runnerid, cad_hash_t *env, int actionindex);
+yacad_task_t *yacad_task_restore(logger_t log, unsigned long id, time_t timestamp, yacad_task_status_t status, json_object_t *run, yacad_runnerid_t *runnerid, yacad_scm_t *scm);
+yacad_task_t *yacad_task_new(logger_t log, json_value_t *action, cad_hash_t *env, const char *root_path);
 
 #endif /* __YACAD_TASK_H__ */
