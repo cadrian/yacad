@@ -86,8 +86,8 @@ static void compare_object(yacad_json_compare_impl_t *this, json_object_t *v1, j
                } else if (x2 == NULL) {
                     this->result = false;
                } else {
-                    this->other.data.object = v2;
-                    v1->accept(v1, I(I(this)));
+                    this->other.data.value = x2;
+                    x1->accept(x1, I(I(this)));
                }
           }
           free(keys);
@@ -109,8 +109,8 @@ static void compare_array(yacad_json_compare_impl_t *this, json_array_t *v1, jso
                } else if (x2 == NULL) {
                     this->result = false;
                } else {
-                    this->other.data.array = v2;
-                    v1->accept(v1, I(I(this)));
+                    this->other.data.value = x2;
+                    x1->accept(x1, I(I(this)));
                }
           }
      }
