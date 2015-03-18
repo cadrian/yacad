@@ -91,7 +91,7 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
      }
 }
 
-static yacad_task_t *get(yacad_tasklist_impl_t *this, yacad_runner_t *runner) {
+static yacad_task_t *get(yacad_tasklist_impl_t *this, yacad_runnerid_t *runnerid) {
      yacad_task_t *result = NULL;
      int index = 0; // TODO find the best matching index
      result = *(yacad_task_t **)this->tasklist->get(this->tasklist, index);

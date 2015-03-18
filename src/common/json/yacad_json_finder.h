@@ -37,6 +37,7 @@ typedef json_number_t *(*yacad_json_finder_get_number_fn)(yacad_json_finder_t *t
 typedef json_const_t *(*yacad_json_finder_get_const_fn)(yacad_json_finder_t *this);
 typedef void (*yacad_json_finder_vvisit_fn)(yacad_json_finder_t *this, json_value_t *value, va_list args);
 typedef void (*yacad_json_finder_visit_fn)(yacad_json_finder_t *this, json_value_t *value, ...);
+typedef void (*yacad_json_finder_free_fn)(yacad_json_finder_t *this);
 
 struct yacad_json_finder_s {
      json_visitor_t fn;
@@ -48,6 +49,7 @@ struct yacad_json_finder_s {
      yacad_json_finder_get_const_fn get_const;
      yacad_json_finder_vvisit_fn vvisit;
      yacad_json_finder_visit_fn visit;
+     yacad_json_finder_free_fn free;
 };
 
 yacad_json_finder_t *yacad_json_finder_new(logger_t log, json_type_t expected_type, const char *pathformat);

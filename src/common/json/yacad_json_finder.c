@@ -19,7 +19,7 @@
 typedef struct {
      yacad_json_finder_t fn;
      logger_t log;
-     char *current_path;
+     char *current_path; // valid only during visit
      json_type_t expected_type;
      bool_t found;
      union {
@@ -138,6 +138,7 @@ static void vvisit(yacad_json_finder_impl_t *this, json_value_t *value, va_list 
      this->current_path = path;
      value->accept(value, I(I(this)));
      free(path);
+     this->current_path = NULL;
 }
 
 static void visit(yacad_json_finder_impl_t *this, json_value_t *value, ...) {
@@ -171,6 +172,7 @@ yacad_json_finder_t *yacad_json_finder_new(logger_t log, json_type_t expected_ty
      result->fn = impl_fn;
      result->log = log;
      result->found = false;
+     result->current_path = NULL;
      result->expected_type = expected_type;
      result->pathformat = pathformat;
      result->value.object = NULL;

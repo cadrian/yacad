@@ -79,6 +79,10 @@ static void *worker_routine(yacad_scheduler_impl_t *this) {
      char buffer[16];
      size_t n = sizeof(buffer);
      struct timeval now;
+     zmq_pollitem_t zitems[] = {
+          {zscheduler, 0, ZMQ_POLLIN, 0},
+     };
+     long timeout;
 
      zmq_connect(zscheduler, INPROC_ADDRESS); // TODO error checking
 
@@ -97,12 +101,21 @@ static void *worker_routine(yacad_scheduler_impl_t *this) {
                check = false;
           }
 
-          sleep(1); // roughly 1 event per second (no need to be accurate here)
-
           gettimeofday(&now, NULL);
-          if (timercmp(&(this->worker_next_check.time), &now, <)) {
-               zmq_send(zscheduler, MSG_CHECK, strlen(MSG_CHECK), 0); // TODO error checking
-               check = true;
+          timeout = this->worker_next_check.time.tv_sec - now.tv_sec;
+          if (timeout < 0) {
+               timeout = 0;
+          }
+
+          zmq_poll(zitems, 1, timeout * 1000L);
+          if (zitems[0].revents & ZMQ_POLLIN) {
+               // TODO: stop running?
+          } else {
+               gettimeofday(&now, NULL);
+               if (timercmp(&(this->worker_next_check.time), &now, <)) {
+                    zmq_send(zscheduler, MSG_CHECK, strlen(MSG_CHECK), 0); // TODO error checking
+                    check = true;
+               }
           }
      }
 

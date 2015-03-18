@@ -29,9 +29,9 @@ typedef struct yacad_scm_git_s {
      int fetch_percent;
      int index_percent;
      json_value_t *desc;
-     char *root_path; // -> data
-     char *upstream_url; // -> data + root_path
-     char data[0];
+     char *root_path; // -> _
+     char *upstream_url; // -> _ + root_path
+     char _[0];
 } yacad_scm_git_t;
 
 #if LIBGIT2_SOVERSION == 21
@@ -201,8 +201,8 @@ yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_value_t
      result->desc = desc;
 
      result->fetch_percent = result->index_percent = -1;
-     result->root_path = result->data;
-     result->upstream_url = result->data + szpath;
+     result->root_path = result->_;
+     result->upstream_url = result->_ + szpath;
      snprintf(result->root_path, szpath, "%s.git", root_path);
      snprintf(result->upstream_url, szurl, "%s", upstream_url);
 

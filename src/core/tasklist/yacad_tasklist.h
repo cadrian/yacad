@@ -18,14 +18,14 @@
 #define __YACAD_TASKLIST_H__
 
 #include "yacad.h"
-#include "core/runner/yacad_runner.h"
+#include "common/runnerid/yacad_runnerid.h"
 #include "common/task/yacad_task.h"
 
 typedef struct yacad_tasklist_s yacad_tasklist_t;
 
 typedef void (*yacad_tasklist_add_fn)(yacad_tasklist_t *this, yacad_task_t *task);
 typedef void (*yacad_tasklist_free_fn)(yacad_tasklist_t *this);
-typedef yacad_task_t *(*yacad_tasklist_get_fn)(yacad_tasklist_t *this, yacad_runner_t *runner);
+typedef yacad_task_t *(*yacad_tasklist_get_fn)(yacad_tasklist_t *this, yacad_runnerid_t *runnerid);
 
 struct yacad_tasklist_s {
      yacad_tasklist_add_fn add;
