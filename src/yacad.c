@@ -19,6 +19,9 @@
 #define DATETIME_FORMAT "%Y-%m-%d %H:%M:%S"
 #define INPROC_ADDRESS "inproc://logger"
 
+#undef zmqcheck
+#define zmqcheck(zmqaction) __zmqcheck(NULL, (zmqaction), warn, #zmqaction, __FILE__, __LINE__)
+
 static void *logger_routine(void *nul) {
      void *zcontext = get_zmq_context();
      void *zscheduler = zmq_socket(zcontext, ZMQ_REP);
@@ -32,17 +35,13 @@ static void *logger_routine(void *nul) {
 
      set_thread_name("logger");
 
-     zmq_bind(zscheduler, INPROC_ADDRESS); // TODO error checking
+     zmqcheck(zmq_bind(zscheduler, INPROC_ADDRESS)); // TODO error checking
      do {
-          r = zmq_poll(zitems, 1, -1);
-          if (r == -1) {
-               running = false;
-          } else if (zitems[0].revents & ZMQ_POLLIN) {
-               zmq_msg_init(&msg); // TODO error checking
-               n = zmq_msg_recv(&msg, zscheduler, 0); // TODO error checking
-               if (n == -1) {
-                    fprintf(stderr, ">>>> %d: %s\n", errno, strerror(errno));
-               } else if (n > 0) {
+          zmqcheck(r = zmq_poll(zitems, 1, -1));
+          if (zitems[0].revents & ZMQ_POLLIN) {
+               zmqcheck(zmq_msg_init(&msg));
+               zmqcheck(n = zmq_msg_recv(&msg, zscheduler, 0));
+               if (n > 0) {
                     if (c < n) {
                          logmsg = realloc(logmsg, n);
                          c = n;
@@ -50,13 +49,12 @@ static void *logger_routine(void *nul) {
                     memcpy(logmsg, zmq_msg_data(&msg), n);
                     fprintf(stderr, "%s\n", logmsg);
                }
-               zmq_msg_close(&msg); // TODO error checking
-
-               zmq_send(zscheduler, "", 0, 0);
+               zmqcheck(zmq_msg_close(&msg));
+               zmqcheck(zmq_send(zscheduler, "", 0, 0));
           }
      } while (running);
 
-     zmq_close(zscheduler);
+     zmqcheck(zmq_close(zscheduler));
      free(logmsg);
 
      return nul;
@@ -93,16 +91,16 @@ static void send_log(level_t level, char *format, va_list arg) {
      n = vsnprintf(logmsg + t, n + 1, format, zarg);
      va_end(zarg);
 
-     zmq_connect(zlogger, INPROC_ADDRESS); // TODO error checking
+     zmqcheck(zmq_connect(zlogger, INPROC_ADDRESS));
 
-     zmq_msg_init_size(&msg, t + n + 1);
+     zmqcheck(zmq_msg_init_size(&msg, t + n + 1));
      memcpy(zmq_msg_data(&msg), logmsg, t + n + 1);
-     zmq_msg_send(&msg, zlogger, 0); // TODO error checking
-     zmq_msg_close(&msg); // TODO error checking
+     zmqcheck(zmq_msg_send(&msg, zlogger, 0));
+     zmqcheck(zmq_msg_close(&msg));
 
-     zmq_recv(zlogger, "", 0, 0);
+     zmqcheck(zmq_recv(zlogger, "", 0, 0));
 
-     zmq_close(zlogger);
+     zmqcheck(zmq_close(zlogger));
 }
 
 #define DEFUN_LOGGER(__level) \
@@ -187,13 +185,17 @@ static void *zmq_context = NULL;
 void *get_zmq_context(void) {
      if (zmq_context == NULL) {
           zmq_context = zmq_ctx_new();
+          if (zmq_context == NULL) {
+               fprintf(stderr, "**** ERROR: could not create 0MQ context\n");
+               exit(1);
+          }
      }
      return zmq_context;
 }
 
 void del_zmq_context(void) {
      if (zmq_context != NULL) {
-          zmq_ctx_term(zmq_context);
+          zmqcheck(zmq_ctx_term(zmq_context));
           zmq_context = NULL;
      }
 }
@@ -206,4 +208,25 @@ const char *get_thread_name(void) {
 
 void set_thread_name(const char *tn) {
      thread_name = tn;
+}
+
+bool_t __zmqcheck(logger_t log, int zmqerr, level_t level, const char *zmqaction, const char *file, unsigned int line) {
+     int result = true;
+     char *paren;
+     int len, err;
+     if (zmqerr == -1) {
+          err = zmq_errno();
+          log(debug, "Error %d in %s line %u: %s", err, file, line, zmqaction);
+          paren = strchrnul(zmqaction, '(');
+          len = paren - zmqaction;
+          if (log != NULL) {
+               log(level, "%.*s: error: %s", len, zmqaction, zmq_strerror(err));
+          } else {
+               fprintf(stderr, "%.*s: error: %s", len, zmqaction, zmq_strerror(err));
+               // no logger, don't continue
+               exit(1);
+          }
+          result = false;
+     }
+     return result;
 }

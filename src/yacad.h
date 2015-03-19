@@ -101,4 +101,7 @@ void del_zmq_context(void);
 const char *get_thread_name(void);
 void set_thread_name(const char *tn);
 
+bool_t __zmqcheck(logger_t log, int zmqerr, level_t level, const char *zmqaction, const char *file, unsigned int line);
+#define zmqcheck(log, zmqaction, level) __zmqcheck(log, (zmqaction), (level), #zmqaction, __FILE__, __LINE__)
+
 #endif /* __YACAD_H__ */
