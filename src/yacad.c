@@ -33,29 +33,31 @@ static void *logger_routine(void *nul) {
      };
      bool_t running = true;
 
-     set_thread_name("logger");
+     if (zscheduler != NULL) {
+          set_thread_name("logger");
 
-     zmqcheck(zmq_bind(zscheduler, INPROC_ADDRESS));
-     do {
-          zmqcheck(r = zmq_poll(zitems, 1, -1));
-          if (zitems[0].revents & ZMQ_POLLIN) {
-               zmqcheck(zmq_msg_init(&msg));
-               zmqcheck(n = zmq_msg_recv(&msg, zscheduler, 0));
-               if (n > 0) {
-                    if (c < n) {
-                         logmsg = realloc(logmsg, n);
-                         c = n;
+          zmqcheck(zmq_bind(zscheduler, INPROC_ADDRESS));
+          do {
+               zmqcheck(r = zmq_poll(zitems, 1, -1));
+               if (zitems[0].revents & ZMQ_POLLIN) {
+                    zmqcheck(zmq_msg_init(&msg));
+                    zmqcheck(n = zmq_msg_recv(&msg, zscheduler, 0));
+                    if (n > 0) {
+                         if (c < n) {
+                              logmsg = realloc(logmsg, n);
+                              c = n;
+                         }
+                         memcpy(logmsg, zmq_msg_data(&msg), n);
+                         fprintf(stderr, "%s\n", logmsg);
                     }
-                    memcpy(logmsg, zmq_msg_data(&msg), n);
-                    fprintf(stderr, "%s\n", logmsg);
+                    zmqcheck(zmq_msg_close(&msg));
+                    zmqcheck(zmq_send(zscheduler, "", 0, 0));
                }
-               zmqcheck(zmq_msg_close(&msg));
-               zmqcheck(zmq_send(zscheduler, "", 0, 0));
-          }
-     } while (running);
+          } while (running);
 
-     zmqcheck(zmq_close(zscheduler));
-     free(logmsg);
+          zmqcheck(zmq_close(zscheduler));
+          free(logmsg);
+     }
 
      return nul;
 }
@@ -77,30 +79,32 @@ static void send_log(level_t level, char *format, va_list arg) {
      va_list zarg;
      char *logmsg;
 
-     gettimeofday(&tm, NULL);
-     tag[255] = '\0';
-     t = snprintf(tag, 255, "%s.%06ld [%s] {%s} ", datetime(tm.tv_sec, date), tm.tv_usec, tagname[level], get_thread_name());
+     if (zlogger != NULL) {
+          gettimeofday(&tm, NULL);
+          tag[255] = '\0';
+          t = snprintf(tag, 255, "%s.%06ld [%s] {%s} ", datetime(tm.tv_sec, date), tm.tv_usec, tagname[level], get_thread_name());
 
-     va_copy(zarg, arg);
-     n = vsnprintf("", 0, format, zarg);
-     va_end(zarg);
+          va_copy(zarg, arg);
+          n = vsnprintf("", 0, format, zarg);
+          va_end(zarg);
 
-     logmsg = alloca(t + n + 1);
-     t = snprintf(logmsg, t + 1, "%s", tag);
-     va_copy(zarg, arg);
-     n = vsnprintf(logmsg + t, n + 1, format, zarg);
-     va_end(zarg);
+          logmsg = alloca(t + n + 1);
+          t = snprintf(logmsg, t + 1, "%s", tag);
+          va_copy(zarg, arg);
+          n = vsnprintf(logmsg + t, n + 1, format, zarg);
+          va_end(zarg);
 
-     zmqcheck(zmq_connect(zlogger, INPROC_ADDRESS));
+          zmqcheck(zmq_connect(zlogger, INPROC_ADDRESS));
 
-     zmqcheck(zmq_msg_init_size(&msg, t + n + 1));
-     memcpy(zmq_msg_data(&msg), logmsg, t + n + 1);
-     zmqcheck(zmq_msg_send(&msg, zlogger, 0));
-     zmqcheck(zmq_msg_close(&msg));
+          zmqcheck(zmq_msg_init_size(&msg, t + n + 1));
+          memcpy(zmq_msg_data(&msg), logmsg, t + n + 1);
+          zmqcheck(zmq_msg_send(&msg, zlogger, 0));
+          zmqcheck(zmq_msg_close(&msg));
 
-     zmqcheck(zmq_recv(zlogger, "", 0, 0));
+          zmqcheck(zmq_recv(zlogger, "", 0, 0));
 
-     zmqcheck(zmq_close(zlogger));
+          zmqcheck(zmq_close(zlogger));
+     }
 }
 
 #define DEFUN_LOGGER(__level) \
