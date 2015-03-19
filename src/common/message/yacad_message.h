@@ -22,11 +22,6 @@
 typedef struct yacad_message_s yacad_message_t;
 typedef struct yacad_message_visitor_s yacad_message_visitor_t;
 
-typedef struct yacad_message_query_get_task_s yacad_message_query_get_task_t;
-typedef struct yacad_message_reply_get_task_s yacad_message_reply_get_task_t;
-typedef struct yacad_message_query_set_result_s yacad_message_query_set_result_t;
-typedef struct yacad_message_reply_set_result_s yacad_message_reply_set_result_t;
-
 typedef void (*yacad_message_accept_fn)(yacad_message_t *this, yacad_message_visitor_t *visitor);
 typedef char *(*yacad_message_serialize_fn)(yacad_message_t *this);
 typedef void (*yacad_message_free_fn)(yacad_message_t *this);
@@ -38,17 +33,5 @@ struct yacad_message_s {
 };
 
 yacad_message_t *yacad_message_unserialize(logger_t log, char *serial, cad_hash_t *env);
-
-typedef void (*yacad_message_visitor_visit_query_get_task_fn)(yacad_message_visitor_t *this, yacad_message_query_get_task_t *message);
-typedef void (*yacad_message_visitor_visit_reply_get_task_fn)(yacad_message_visitor_t *this, yacad_message_reply_get_task_t *message);
-typedef void (*yacad_message_visitor_visit_query_set_result_fn)(yacad_message_visitor_t *this, yacad_message_query_set_result_t *message);
-typedef void (*yacad_message_visitor_visit_reply_set_result_fn)(yacad_message_visitor_t *this, yacad_message_reply_set_result_t *message);
-
-struct yacad_message_visitor_s {
-     yacad_message_visitor_visit_query_get_task_fn visit_query_get_task;
-     yacad_message_visitor_visit_reply_get_task_fn visit_reply_get_task;
-     yacad_message_visitor_visit_query_set_result_fn visit_query_set_result;
-     yacad_message_visitor_visit_reply_set_result_fn visit_reply_set_result;
-};
 
 #endif /* __YACAD_MESSAGE_H__ */

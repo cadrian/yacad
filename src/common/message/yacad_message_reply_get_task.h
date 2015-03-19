@@ -22,6 +22,8 @@
 #include "common/scm/yacad_scm.h"
 #include "common/task/yacad_task.h"
 
+typedef struct yacad_message_reply_get_task_s yacad_message_reply_get_task_t;
+
 typedef yacad_runnerid_t *(*yacad_message_reply_get_task_get_runnerid_fn)(yacad_message_reply_get_task_t *this);
 typedef yacad_scm_t *(*yacad_message_reply_get_task_get_scm_fn)(yacad_message_reply_get_task_t *this);
 typedef yacad_task_t *(*yacad_message_reply_get_task_get_task_fn)(yacad_message_reply_get_task_t *this);

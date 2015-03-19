@@ -15,6 +15,7 @@
 */
 
 #include "yacad_message_query_get_task.h"
+#include "yacad_message_visitor.h"
 #include "common/json/yacad_json_finder.h"
 
 typedef struct yacad_message_query_get_task_impl_s {

@@ -15,6 +15,7 @@
 */
 
 #include "yacad_message_reply_get_task.h"
+#include "yacad_message_visitor.h"
 #include "common/json/yacad_json_finder.h"
 #include "common/json/yacad_json_template.h"
 

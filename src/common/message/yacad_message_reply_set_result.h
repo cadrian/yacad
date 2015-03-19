@@ -19,6 +19,8 @@
 
 #include "yacad_message.h"
 
+typedef struct yacad_message_reply_set_result_s yacad_message_reply_set_result_t;
+
 struct yacad_message_reply_set_result_s {
      yacad_message_t fn;
 };
