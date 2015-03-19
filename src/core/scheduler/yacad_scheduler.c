@@ -17,6 +17,7 @@
 #include "yacad_scheduler.h"
 #include "core/project/yacad_project.h"
 #include "core/tasklist/yacad_tasklist.h"
+#include "common/message/yacad_message_visitor.h"
 
 #define INPROC_CHECK_ADDRESS "inproc://scheduler-check"
 #define INPROC_RUN_ADDRESS "inproc://scheduler-run"
@@ -193,21 +194,65 @@ static void send_task(yacad_scheduler_impl_t *this, yacad_task_t *task, void *zr
      free(run);
 }
 
+typedef struct {
+     yacad_message_visitor_t fn;
+     yacad_scheduler_impl_t *scheduler;
+     void *zrunner;
+} yacad_scheduler_message_visitor_t;
+
+static void visit_query_get_task(yacad_scheduler_message_visitor_t *this, yacad_message_query_get_task_t *message) {
+     yacad_runnerid_t *runnerid = message->get_runnerid(message);
+     yacad_task_t *task;
+
+     if (runnerid == NULL) {
+          this->scheduler->conf->log(warn, "Missing runnerid");
+     } else {
+          task = this->scheduler->tasklist->get(this->scheduler->tasklist, runnerid);
+          if (task == NULL) {
+               this->scheduler->conf->log(info, "No suitable task for runnerid: %s", runnerid->serialize(runnerid));
+               zmqcheck(this->scheduler->conf->log, zmq_send(this->zrunner, "", 0, 0), warn);
+          } else {
+               this->scheduler->conf->log(info, "Sending task %lu to runnerid: %s", task->get_id(task), runnerid->serialize(runnerid));
+               send_task(this->scheduler, task, this->zrunner);
+          }
+     }
+}
+
+static void visit_reply_get_task(yacad_scheduler_message_visitor_t *this, yacad_message_reply_get_task_t *message) {
+     this->scheduler->conf->log(warn, "Unexpected message");
+}
+
+static void visit_query_set_result(yacad_scheduler_message_visitor_t *this, yacad_message_query_set_result_t *message) {
+     this->scheduler->conf->log(warn, "Not yet implemented"); // TODO
+}
+
+static void visit_reply_set_result(yacad_scheduler_message_visitor_t *this, yacad_message_reply_set_result_t *message) {
+     this->scheduler->conf->log(warn, "Unexpected message");
+}
+
+static yacad_message_visitor_t scheduler_message_visitor_fn = {
+     .visit_query_get_task = (yacad_message_visitor_visit_query_get_task_fn)visit_query_get_task,
+     .visit_reply_get_task = (yacad_message_visitor_visit_reply_get_task_fn)visit_reply_get_task,
+     .visit_query_set_result = (yacad_message_visitor_visit_query_set_result_fn)visit_query_set_result,
+     .visit_reply_set_result = (yacad_message_visitor_visit_reply_set_result_fn)visit_reply_set_result,
+};
+
 static void run(yacad_scheduler_impl_t *this) {
      void *zcontext = get_zmq_context();
      void *zworker_check = zmq_socket(zcontext, ZMQ_PAIR);
      void *zworker_run = zmq_socket(zcontext, ZMQ_PAIR);
      void *zrunner = zmq_socket(zcontext, ZMQ_REP);
      int i;
-     char buffer[512];
+     char buffer[512]; // TODO replace by a 0MQ message to ensure big sizes
      size_t n = sizeof(buffer);
      cad_hash_t *projects;
      zmq_pollitem_t zitems[] = {
           {zworker_check, 0, ZMQ_POLLIN, 0},
           {zrunner, 0, ZMQ_POLLIN, 0},
      };
-     yacad_runnerid_t *runnerid;
-     yacad_task_t *task;
+
+     yacad_scheduler_message_visitor_t v = { scheduler_message_visitor_fn, this, zrunner };
+     yacad_message_t *message;
 
      if (zworker_check != NULL && zworker_run != NULL && zrunner != NULL) {
           if (zmqcheck(this->conf->log, zmq_bind(zworker_check, INPROC_CHECK_ADDRESS), warn)
@@ -236,18 +281,12 @@ static void run(yacad_scheduler_impl_t *this) {
                     } else if (zitems[1].revents & ZMQ_POLLIN) {
                          if (!zmqcheck(this->conf->log, i = zmq_recv(zrunner, buffer, n, 0), warn)) {
                               buffer[i] = '\0';
-                              runnerid = yacad_runnerid_unserialize(this->conf->log, buffer); // TODO not enough; we need an action such as "please gimme work" or "here are some results"
-                              if (runnerid == NULL) {
-                                   this->conf->log(warn, "Received invalid runnerid: %s", buffer);
+                              message = yacad_message_unserialize(this->conf->log, buffer, NULL);
+                              if (message == NULL) {
+                                   this->conf->log(warn, "Received invalid message: %s", buffer);
                               } else {
-                                   task = this->tasklist->get(this->tasklist, runnerid);
-                                   if (task == NULL) {
-                                        this->conf->log(info, "No suitable task for runnerid: %s", buffer);
-                                        zmqcheck(this->conf->log, zmq_send(zrunner, "", 0, 0), warn);
-                                   } else {
-                                        this->conf->log(info, "Sending task %lu to runnerid: %s", task->get_id(task), buffer);
-                                        send_task(this, task, zrunner);
-                                   }
+                                   message->accept(message, I(&v));
+                                   message->free(message);
                               }
                          }
                     }
