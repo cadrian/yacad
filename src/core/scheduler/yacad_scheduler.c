@@ -162,6 +162,37 @@ static void iterate_check_project(cad_hash_t *projects, int index, const char *p
      }
 }
 
+static void send_task(yacad_scheduler_impl_t *this, yacad_task_t *task, void *zrunner) {
+     char *src, *run, *serial;
+     json_output_stream_t *out;
+     json_visitor_t *writer;
+     size_t n;
+     json_value_t *jsource = task->get_source(task);
+     json_value_t *jrun = task->get_run(task);
+
+     out = new_json_output_stream_from_string(&src, stdlib_memory);
+     writer = json_write_to(out, stdlib_memory, 0);
+     jsource->accept(jsource, writer);
+     writer->free(writer);
+     out->free(out);
+
+     out = new_json_output_stream_from_string(&run, stdlib_memory);
+     writer = json_write_to(out, stdlib_memory, 0);
+     jrun->accept(jrun, writer);
+     writer->free(writer);
+     out->free(out);
+
+     n = snprintf("", 0, "{\"id\":%lu,\"source\":%s,\"run\":%s}", task->get_id(task), src, run) + 1;
+     serial = malloc(n);
+     snprintf(serial, n, "{\"id\":%lu,\"source\":%s,\"run\":%s}", task->get_id(task), src, run);
+
+     zmqcheck(this->conf->log, zmq_send(zrunner, serial, n, 0), warn);
+
+     free(serial);
+     free(src);
+     free(run);
+}
+
 static void run(yacad_scheduler_impl_t *this) {
      void *zcontext = get_zmq_context();
      void *zworker_check = zmq_socket(zcontext, ZMQ_PAIR);
@@ -214,8 +245,8 @@ static void run(yacad_scheduler_impl_t *this) {
                                         this->conf->log(info, "No suitable task for runnerid: %s", buffer);
                                         zmqcheck(this->conf->log, zmq_send(zrunner, "", 0, 0), warn);
                                    } else {
-                                        // TODO send the task
-                                        this->conf->log(info, "Sending task to runnerid: %s", buffer);
+                                        this->conf->log(info, "Sending task %lu to runnerid: %s", task->get_id(task), buffer);
+                                        send_task(this, task, zrunner);
                                    }
                               }
                          }

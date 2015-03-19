@@ -109,7 +109,7 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
                sqlcheck(this->db, this->log, sqlite3_finalize(query), warn);
           }
 
-          this->log(info, "Added task: {\"runnerid\":%s,\"source\":%s,\"run\":%s}", rid, src, run);
+          this->log(info, "Added task: {\"id\":%lu,\"runnerid\":%s,\"source\":%s,\"run\":%s}", task->get_id(task), rid, src, run);
           this->tasklist->insert(this->tasklist, n, &task);
 
           free(src);
@@ -178,7 +178,7 @@ static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, sqlite3_
      task = yacad_task_restore(this->log, (unsigned long)sql_id, (time_t)sql_timestamp, (yacad_task_status_t)sql_status, jrun, jsource, runnerid);
 
      this->tasklist->insert(this->tasklist, this->tasklist->count(this->tasklist), &task);
-     this->log(info, "Restored task: {\"runnerid\":%s,\"source\":%s,\"run\":%s}", sql_runnerid, sql_source, sql_run);
+     this->log(info, "Restored task: {\"id\":%lu,\"runnerid\":%s,\"source\":%s,\"run\":%s}", (unsigned long)sql_id, sql_runnerid, sql_source, sql_run);
 }
 
 yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
