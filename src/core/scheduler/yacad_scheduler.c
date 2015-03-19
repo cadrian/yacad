@@ -168,13 +168,15 @@ static void run(yacad_scheduler_impl_t *this) {
      void *zworker_run = zmq_socket(zcontext, ZMQ_PAIR);
      void *zrunner = zmq_socket(zcontext, ZMQ_REP);
      int i;
-     char buffer[16];
+     char buffer[512];
      size_t n = sizeof(buffer);
      cad_hash_t *projects;
      zmq_pollitem_t zitems[] = {
           {zworker_check, 0, ZMQ_POLLIN, 0},
           {zrunner, 0, ZMQ_POLLIN, 0},
      };
+     yacad_runnerid_t *runnerid;
+     yacad_task_t *task;
 
      if (zworker_check != NULL && zworker_run != NULL && zrunner != NULL) {
           if (zmqcheck(this->conf->log, zmq_bind(zworker_check, INPROC_CHECK_ADDRESS), warn)
@@ -202,7 +204,20 @@ static void run(yacad_scheduler_impl_t *this) {
                          }
                     } else if (zitems[1].revents & ZMQ_POLLIN) {
                          if (!zmqcheck(this->conf->log, i = zmq_recv(zrunner, buffer, n, 0), warn)) {
-                              // TODO send a task according to the runner description
+                              buffer[i] = '\0';
+                              runnerid = yacad_runnerid_unserialize(this->conf->log, buffer); // TODO not enough; we need an action such as "please gimme work" or "here are some results"
+                              if (runnerid == NULL) {
+                                   this->conf->log(warn, "Received invalid runnerid: %s", buffer);
+                              } else {
+                                   task = this->tasklist->get(this->tasklist, runnerid);
+                                   if (task == NULL) {
+                                        this->conf->log(info, "No suitable task for runnerid: %s", buffer);
+                                        zmqcheck(this->conf->log, zmq_send(zrunner, "", 0, 0), warn);
+                                   } else {
+                                        // TODO send the task
+                                        this->conf->log(info, "Sending task to runnerid: %s", buffer);
+                                   }
+                              }
                          }
                     }
                }
