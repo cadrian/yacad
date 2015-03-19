@@ -57,7 +57,7 @@ int main(int argc, const char * const *argv) {
      conf->log(debug, "Scheduler returned.");
 
      scheduler->free(scheduler);
-     conf->free(conf);
+     //conf->free(conf); // TODO to check
 
      del_zmq_context();
 
