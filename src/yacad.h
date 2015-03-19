@@ -98,4 +98,7 @@ logger_t get_logger(level_t level);
 void *get_zmq_context(void);
 void del_zmq_context(void);
 
+const char *get_thread_name(void);
+void set_thread_name(const char *tn);
+
 #endif /* __YACAD_H__ */

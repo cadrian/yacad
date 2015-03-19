@@ -28,12 +28,15 @@ static void *logger_routine(void *nul) {
      zmq_pollitem_t zitems[] = {
           {zscheduler, 0, ZMQ_POLLIN, 0},
      };
+     bool_t running = true;
+
+     set_thread_name("logger");
 
      zmq_bind(zscheduler, INPROC_ADDRESS); // TODO error checking
      do {
-          zmq_poll(zitems, 1, -1);
-
-          if (zitems[0].revents & ZMQ_POLLIN) {
+          if (zmq_poll(zitems, 1, -1) == -1) {
+               running = false;
+          } else if (zitems[0].revents & ZMQ_POLLIN) {
                zmq_msg_init(&msg); // TODO error checking
                n = zmq_msg_recv(&msg, zscheduler, 0); // TODO error checking
                if (n == -1) {
@@ -50,7 +53,7 @@ static void *logger_routine(void *nul) {
 
                zmq_send(zscheduler, "", 0, 0);
           }
-     } while (true);
+     } while (running);
 
      free(logmsg);
 
@@ -61,7 +64,7 @@ static void send_log(level_t level, char *format, va_list arg) {
      void *zcontext = get_zmq_context();
      void *zlogger = zmq_socket(zcontext, ZMQ_REQ);
      struct timeval tm;
-     char tag[40];
+     char tag[256];
      static char *tagname[] = {
           "WARN ",
           "INFO ",
@@ -75,14 +78,14 @@ static void send_log(level_t level, char *format, va_list arg) {
      char *logmsg;
 
      gettimeofday(&tm, NULL);
-     tag[39] = '\0';
-     t = snprintf(tag, 39, "%s.%06ld [%s] ", datetime(tm.tv_sec, date), tm.tv_usec, tagname[level]);
+     tag[255] = '\0';
+     t = snprintf(tag, 255, "%s.%06ld [%s] {%s} ", datetime(tm.tv_sec, date), tm.tv_usec, tagname[level], get_thread_name());
 
      va_copy(zarg, arg);
      n = vsnprintf("", 0, format, zarg);
      va_end(zarg);
 
-     logmsg = malloc(t + n + 1);
+     logmsg = alloca(t + n + 1);
      t = snprintf(logmsg, t + 1, "%s", tag);
      va_copy(zarg, arg);
      n = vsnprintf(logmsg + t, n + 1, format, zarg);
@@ -98,8 +101,6 @@ static void send_log(level_t level, char *format, va_list arg) {
      zmq_recv(zlogger, "", 0, 0);
 
      zmq_disconnect(zlogger, INPROC_ADDRESS);
-
-     free(logmsg);
 }
 
 #define DEFUN_LOGGER(__level) \
@@ -193,4 +194,14 @@ void del_zmq_context(void) {
           zmq_ctx_term(zmq_context);
           zmq_context = NULL;
      }
+}
+
+static __thread const char *thread_name = NULL;
+
+const char *get_thread_name(void) {
+     return thread_name;
+}
+
+void set_thread_name(const char *tn) {
+     thread_name = tn;
 }

@@ -14,20 +14,47 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <signal.h>
+
 #include "conf/yacad_conf.h"
 #include "scheduler/yacad_scheduler.h"
 
+static yacad_conf_t *conf = NULL;
+static yacad_scheduler_t *scheduler = NULL;
+
+static void handle_signal(int signal) {
+     if (conf != NULL) {
+          conf->log(info, "Received signal %d", signal);
+     }
+     if (scheduler != NULL) {
+          scheduler->stop(scheduler);
+     }
+}
+
 int main(int argc, const char * const *argv) {
-     yacad_conf_t *conf;
-     yacad_scheduler_t *scheduler;
+     struct sigaction action;
+
+     set_thread_name("core");
 
      get_zmq_context();
 
      conf = yacad_conf_new();
      conf->log(info, "yaCAD core version %s - READY", yacad_version());
 
+     action.sa_handler = handle_signal;
+     action.sa_flags = 0;
+     sigemptyset(&action.sa_mask);
+     if (sigaction(SIGINT, &action, NULL) < 0) {
+          conf->log(warn, "Could not set SIGINT action handler");
+     }
+     if (sigaction(SIGTERM, &action, NULL) < 0) {
+          conf->log(warn, "Could not set SIGTERM action handler");
+     }
+
      scheduler = yacad_scheduler_new(conf);
      scheduler->run(scheduler);
+
+     conf->log(debug, "Scheduler returned.");
 
      scheduler->free(scheduler);
      conf->free(conf);
