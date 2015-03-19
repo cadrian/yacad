@@ -35,7 +35,7 @@ static void *logger_routine(void *nul) {
 
      set_thread_name("logger");
 
-     zmqcheck(zmq_bind(zscheduler, INPROC_ADDRESS)); // TODO error checking
+     zmqcheck(zmq_bind(zscheduler, INPROC_ADDRESS));
      do {
           zmqcheck(r = zmq_poll(zitems, 1, -1));
           if (zitems[0].revents & ZMQ_POLLIN) {

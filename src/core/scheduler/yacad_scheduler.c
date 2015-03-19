@@ -39,7 +39,7 @@ typedef struct yacad_scheduler_impl_s {
 } yacad_scheduler_impl_t;
 
 static bool_t is_done(yacad_scheduler_impl_t *this) {
-     return false; // TODO
+     return !this->running;
 }
 
 static void stop(yacad_scheduler_impl_t *this) {
