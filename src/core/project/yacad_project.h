@@ -42,6 +42,6 @@ struct yacad_project_s {
      yacad_project_free_fn free;
 };
 
-yacad_project_t *yacad_project_new(logger_t log, const char *name, const char *root_path, yacad_cron_t *cron, yacad_scm_t *scm, json_array_t *actions);
+yacad_project_t *yacad_project_new(logger_t log, const char *name, const char *root_path, yacad_cron_t *cron, yacad_scm_t *scm, json_array_t *tasks);
 
 #endif /* __YACAD_PROJECT_H__ */

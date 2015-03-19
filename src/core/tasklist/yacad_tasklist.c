@@ -22,13 +22,13 @@
      "ID integer primary key asc autoincrement, "        \
      "TIMESTAMP integer not null, "                      \
      "STATUS integer not null, "                         \
-     "DESC not null,"                                    \
-     "RUNNERID not null,"                                \
-     "ACTIONINDEX integer not null"                      \
+     "SOURCE not null,"                                  \
+     "RUN not null,"                                     \
+     "RUNNERID not null"                                 \
      ")"
 
-#define STMT_SELECT "select ID, TIMESTAMP, STATUS, DESC, RUNNERID, ACTIONINDEX from TASKLIST where STATUS=? order by ID asc"
-#define STMT_INSERT "insert into TASKLIST (TIMESTAMP, STATUS, DESC, RUNNERID, ACTIONINDEX) values (?,?,?,?,?)"
+#define STMT_SELECT "select ID, TIMESTAMP, STATUS, SOURCE, RUN, RUNNERID from TASKLIST where STATUS=? order by ID asc"
+#define STMT_INSERT "insert into TASKLIST (TIMESTAMP, STATUS, SOURCE, RUN, RUNNERID) values (?,?,?,?,?)"
 #define STMT_UPDATE "update TASKLIST set STATUS=? where ID = ?"
 
 typedef struct yacad_tasklist_impl_s {
@@ -66,11 +66,15 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
      yacad_task_t *other;
      sqlite3_stmt *query = NULL;
      yacad_runnerid_t *runnerid = task->get_runnerid(task);
-     const char *desc = task->serialize(task);
-     const char *rid = runnerid->serialize(runnerid);
+     json_value_t *jsource = task->get_source(task);
+     json_value_t *jrun = task->get_run(task);
+     char *src;
+     char *run;
+     const char *rid;
      time_t timestamp = task->get_timestamp(task);
      yacad_task_status_t status = task->get_status(task);
-     int actionindex = task->get_actionindex(task);
+     json_output_stream_t *out;
+     json_visitor_t *writer;
 
      n = this->tasklist->count(this->tasklist);
      for (i = 0; !found && i < n; i++) {
@@ -78,23 +82,38 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
           found = task->same_as(task, other);
      }
      if (found) {
-          this->log(debug, "Task not added: %s", desc);
           task->free(task);
      } else {
+          out = new_json_output_stream_from_string(&src, stdlib_memory);
+          writer = json_write_to(out, stdlib_memory, 0);
+          jsource->accept(jsource, writer);
+          writer->free(writer);
+          out->free(out);
+
+          out = new_json_output_stream_from_string(&run, stdlib_memory);
+          writer = json_write_to(out, stdlib_memory, 0);
+          jrun->accept(jrun, writer);
+          writer->free(writer);
+          out->free(out);
+
+          rid = runnerid->serialize(runnerid);
+
           if (sqlcheck(this->db, this->log, sqlite3_prepare_v2(this->db, STMT_INSERT, -1, &query, NULL), warn)) {
                sqlcheck(this->db, this->log, sqlite3_bind_int64(query, 1, (sqlite3_int64)timestamp), warn);
                sqlcheck(this->db, this->log, sqlite3_bind_int(query, 2, (int)status), warn);
-               sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 3, desc, strlen(desc), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
-               sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 4, rid, strlen(rid), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
-               sqlcheck(this->db, this->log, sqlite3_bind_int(query, 5, actionindex), warn);
+               sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 3, src, strlen(src), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
+               sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 4, run, strlen(run), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
+               sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 5, rid, strlen(rid), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
                sqlite3_step(query);
                task->set_id(task, (unsigned long)sqlite3_last_insert_rowid(this->db));
                sqlcheck(this->db, this->log, sqlite3_finalize(query), warn);
           }
 
-          desc = task->serialize(task);
-          this->log(info, "Added task: %s", desc);
+          this->log(info, "Added task: {\"runnerid\":%s,\"source\":%s,\"run\":%s}", rid, src, run);
           this->tasklist->insert(this->tasklist, n, &task);
+
+          free(src);
+          free(run);
      }
 }
 
@@ -139,11 +158,27 @@ static yacad_tasklist_t impl_fn = {
      .free = (yacad_tasklist_free_fn)free_,
 };
 
-static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, sqlite3_int64 sql_timestamp, int sql_status, const unsigned char *sql_desc, const unsigned char *sql_runnerid, int actionindex) {
-     yacad_runnerid_t *runnerid = yacad_runnerid_unserialize(this->log, (char*)sql_runnerid);
-     yacad_task_t *task = yacad_task_unserialize(this->log, (unsigned long)sql_id, (time_t)sql_timestamp, (yacad_task_status_t)sql_status, (char*)sql_desc, runnerid, actionindex);
+static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, sqlite3_int64 sql_timestamp, int sql_status, const unsigned char *sql_source, const unsigned char *sql_run, const unsigned char *sql_runnerid) {
+     yacad_task_t *task;
+     json_value_t *jrun;
+     json_value_t *jsource;
+     yacad_runnerid_t *runnerid;
+     json_input_stream_t *in;
+
+     in = new_json_input_stream_from_string((char*)sql_source, stdlib_memory);
+     jsource = json_parse(in, NULL, stdlib_memory);
+     in->free(in);
+
+     in = new_json_input_stream_from_string((char*)sql_run, stdlib_memory);
+     jrun = json_parse(in, NULL, stdlib_memory);
+     in->free(in);
+
+     runnerid = yacad_runnerid_unserialize(this->log, (char*)sql_runnerid);
+
+     task = yacad_task_restore(this->log, (unsigned long)sql_id, (time_t)sql_timestamp, (yacad_task_status_t)sql_status, jrun, jsource, runnerid);
+
      this->tasklist->insert(this->tasklist, this->tasklist->count(this->tasklist), &task);
-     this->log(info, "Restored task: %s [runnerid %s]", sql_desc, sql_runnerid);
+     this->log(info, "Restored task: {\"runnerid\":%s,\"source\":%s,\"run\":%s}", sql_runnerid, sql_source, sql_run);
 }
 
 yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
@@ -200,7 +235,7 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
                              sqlite3_column_int(query, 2),
                              sqlite3_column_text(query, 3),
                              sqlite3_column_text(query, 4),
-                             sqlite3_column_int(query, 5));
+                             sqlite3_column_text(query, 5));
                     break;
                default:
                     sqlcheck(db, log, err, warn);

@@ -48,7 +48,7 @@ static yacad_task_t *check(yacad_project_impl_t *this) {
      cad_hash_t *env = cad_new_hash(stdlib_memory, cad_hash_strings);
      if (this->scm->check(this->scm)) {
           this->scm->fill_env(this->scm, env);
-          result = yacad_task_new(this->log, this->tasks->get(this->tasks, this->taskindex), this->env, this->root_path);
+          result = yacad_task_new(this->log, this->tasks->get(this->tasks, this->taskindex), env);
      }
      env->clean(env, (cad_hash_iterator_fn)env_cleaner, this);
      env->free(env);
@@ -60,7 +60,7 @@ static void next_task(yacad_project_impl_t *this) {
 }
 
 static bool_t is_done(yacad_project_impl_t *this) {
-     this->taskindex >= this->tasks->count(this->tasks);
+     return this->taskindex >= this->tasks->count(this->tasks);
 }
 
 static void free_(yacad_project_impl_t *this) {
@@ -72,7 +72,7 @@ static yacad_project_t impl_fn = {
      .get_name = (yacad_project_get_name_fn) get_name,
      .next_check = (yacad_project_next_check_fn) next_check,
      .check = (yacad_project_check_fn) check,
-     .next_task = (yacad_project_next_tasl_fn)next_task,
+     .next_task = (yacad_project_next_task_fn)next_task,
      .is_done = (yacad_project_is_done_fn)is_done,
      .free = (yacad_project_free_fn) free_,
 };

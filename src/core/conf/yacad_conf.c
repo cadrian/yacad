@@ -199,13 +199,13 @@ static char *json_to_string(yacad_json_finder_t *v, json_value_t *value, ...) {
 static void read_projects(yacad_conf_impl_t *this) {
      yacad_json_finder_t *vprojects = yacad_json_finder_new(I(this)->log, json_type_array, "projects");
      yacad_json_finder_t *vproject;
-     yacad_json_finder_t *vscm;
-     yacad_json_finder_t *vrunner;
+     yacad_json_finder_t *vobject;
+     yacad_json_finder_t *varray;
      json_value_t *jproject;
      json_array_t *jprojects;
-     json_object_t *jrunner;
      yacad_project_t *project;
      json_value_t *jscm;
+     json_array_t *jtasks;
      char *name, *root_path, *crondesc;
      yacad_scm_t *scm = NULL;
      yacad_cron_t *cron = NULL;
@@ -216,8 +216,8 @@ static void read_projects(yacad_conf_impl_t *this) {
           np = jprojects->count(jprojects);
           if (np > 0) {
                vproject = yacad_json_finder_new(I(this)->log, json_type_string, "%s");
-               vscm = yacad_json_finder_new(I(this)->log, json_type_object, "scm");
-               vrunner = yacad_json_finder_new(I(this)->log, json_type_object, "runner");
+               vobject = yacad_json_finder_new(I(this)->log, json_type_object, "%s");
+               varray = yacad_json_finder_new(I(this)->log, json_type_array, "%s");
                for (i = 0; i < np; i++) {
                     jproject = jprojects->get(jprojects, i);
                     name = json_to_string(vproject, jproject, "name");
@@ -229,7 +229,7 @@ static void read_projects(yacad_conf_impl_t *this) {
                          scm = NULL;
                          cron = NULL;
                          root_path = NULL;
-                         jrunner = NULL;
+                         jtasks = NULL;
 
                          // Prepare root_path
                          n = snprintf("", 0, "%s/%s", this->root_path, name) + 1;
@@ -237,8 +237,8 @@ static void read_projects(yacad_conf_impl_t *this) {
                          snprintf(root_path, n, "%s/%s", this->root_path, name);
 
                          // Prepare scm
-                         vscm->visit(vscm, jproject);
-                         jscm = vscm->get_value(vscm);
+                         vobject->visit(vobject, jproject, "scm");
+                         jscm = vobject->get_value(vobject);
                          if (jscm != NULL) {
                               scm = yacad_scm_new(I(this)->log, jscm, root_path);
                          }
@@ -250,9 +250,9 @@ static void read_projects(yacad_conf_impl_t *this) {
                          }
                          cron = yacad_cron_parse(I(this)->log, crondesc);
 
-                         // Prepare jrunner
-                         vrunner->visit(vrunner, jproject);
-                         jrunner = vrunner->get_object(vrunner);
+                         // Prepare jtasks
+                         varray->visit(varray, jproject, "tasks");
+                         jtasks = varray->get_array(varray);
 
                          if (scm == NULL) {
                               I(this)->log(warn, "Project \"%s\": undefined scm", name);
@@ -262,8 +262,12 @@ static void read_projects(yacad_conf_impl_t *this) {
                          } else if (cron == NULL) {
                               I(this)->log(warn, "Project \"%s\": invalid cron", name);
                               scm->free(scm);
+                         } else if (jtasks == NULL) {
+                              I(this)->log(warn, "Project \"%s\": no tasks!", name);
+                              scm->free(scm);
+                              cron->free(cron);
                          } else {
-                              project = yacad_project_new(I(this)->log, name, this->root_path, scm, cron, jrunner);
+                              project = yacad_project_new(I(this)->log, name, this->root_path, cron, scm, jtasks);
                               if (project == NULL) {
                                    cron->free(cron);
                                    scm->free(scm);
@@ -277,8 +281,8 @@ static void read_projects(yacad_conf_impl_t *this) {
                     }
                     free(name);
                }
-               I(vrunner)->free(I(vrunner));
-               I(vscm)->free(I(vscm));
+               I(varray)->free(I(varray));
+               I(vobject)->free(I(vobject));
                I(vproject)->free(I(vproject));
           }
      }
