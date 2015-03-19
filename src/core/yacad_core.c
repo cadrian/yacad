@@ -22,9 +22,9 @@
 static yacad_conf_t *conf = NULL;
 static yacad_scheduler_t *scheduler = NULL;
 
-static void handle_signal(int signal) {
+static void handle_signal(int sig) {
      if (conf != NULL) {
-          conf->log(info, "Received signal %d", signal);
+          conf->log(info, "Received signal %d: %s", sig, strsignal(sig));
      }
      if (scheduler != NULL) {
           scheduler->stop(scheduler);
@@ -54,12 +54,12 @@ int main(int argc, const char * const *argv) {
      scheduler = yacad_scheduler_new(conf);
      scheduler->run(scheduler);
 
-     conf->log(debug, "Scheduler returned.");
+     conf->log(info, "yaCAD stopped.");
+
+     del_zmq_context();
 
      scheduler->free(scheduler);
      //conf->free(conf); // TODO to check
-
-     del_zmq_context();
 
      return 0;
 }

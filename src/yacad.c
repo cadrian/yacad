@@ -23,7 +23,7 @@ static void *logger_routine(void *nul) {
      void *zcontext = get_zmq_context();
      void *zscheduler = zmq_socket(zcontext, ZMQ_REP);
      zmq_msg_t msg;
-     int n, c = 0;
+     int n, c = 0, r;
      char *logmsg = NULL;
      zmq_pollitem_t zitems[] = {
           {zscheduler, 0, ZMQ_POLLIN, 0},
@@ -34,7 +34,8 @@ static void *logger_routine(void *nul) {
 
      zmq_bind(zscheduler, INPROC_ADDRESS); // TODO error checking
      do {
-          if (zmq_poll(zitems, 1, -1) == -1) {
+          r = zmq_poll(zitems, 1, -1);
+          if (r == -1) {
                running = false;
           } else if (zitems[0].revents & ZMQ_POLLIN) {
                zmq_msg_init(&msg); // TODO error checking
@@ -55,6 +56,7 @@ static void *logger_routine(void *nul) {
           }
      } while (running);
 
+     zmq_close(zscheduler);
      free(logmsg);
 
      return nul;
@@ -100,7 +102,7 @@ static void send_log(level_t level, char *format, va_list arg) {
 
      zmq_recv(zlogger, "", 0, 0);
 
-     zmq_disconnect(zlogger, INPROC_ADDRESS);
+     zmq_close(zlogger);
 }
 
 #define DEFUN_LOGGER(__level) \
