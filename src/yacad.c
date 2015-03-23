@@ -95,18 +95,14 @@ bool_t __zmqcheck(logger_t log, int zmqerr, level_t level, const char *zmqaction
      char *paren;
      int len, err;
      if (zmqerr == -1) {
-          err = zmq_errno();
-          log(debug, "Error %d in %s line %u: %s", err, file, line, zmqaction);
-          paren = strchrnul(zmqaction, '(');
-          len = paren - zmqaction;
-          if (log != NULL) {
-               log(level, "%.*s: error: %s", len, zmqaction, zmq_strerror(err));
-          } else {
-               fprintf(stderr, "%.*s: error: %s", len, zmqaction, zmq_strerror(err));
-               // no logger, don't continue
-               exit(1);
-          }
           result = false;
+          if (log != NULL) {
+               err = zmq_errno();
+               paren = strchrnul(zmqaction, '(');
+               len = paren - zmqaction;
+               log(debug, "Error %d in %s line %u: %s", err, file, line, zmqaction);
+               log(level, "%.*s: error: %s", len, zmqaction, zmq_strerror(err));
+          }
      }
      return result;
 }
