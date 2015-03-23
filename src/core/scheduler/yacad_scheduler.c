@@ -242,9 +242,9 @@ static void run(yacad_scheduler_impl_t *this) {
      void *zworker_check = zmq_socket(zcontext, ZMQ_PAIR);
      void *zworker_run = zmq_socket(zcontext, ZMQ_PAIR);
      void *zrunner = zmq_socket(zcontext, ZMQ_REP);
-     int i;
-     char buffer[512]; // TODO replace by a 0MQ message to ensure big sizes
-     size_t n = sizeof(buffer);
+     int n, c = 0;
+     zmq_msg_t msg;
+     char *strmsg = NULL;
      cad_hash_t *projects;
      zmq_pollitem_t zitems[] = {
           {zworker_check, 0, ZMQ_POLLIN, 0},
@@ -269,26 +269,63 @@ static void run(yacad_scheduler_impl_t *this) {
                     if (!zmqcheck(this->conf->log, zmq_poll(zitems, 2, -1), debug)) {
                          this->running = false;
                     } else if (zitems[0].revents & ZMQ_POLLIN) {
-                         if (!zmqcheck(this->conf->log, i = zmq_recv(zworker_check, buffer, n, 0), error)) {
-                              this->running = false;
-                         } else if (!strncmp(buffer, MSG_STOP, i)) {
-                              this->running = false;
-                         } else if (!strncmp(buffer, MSG_CHECK, i)) {
-                              this->conf->log(debug, "Checking projects");
-                              projects = this->conf->get_projects(this->conf);
-                              projects->iterate(projects, (cad_hash_iterator_fn)iterate_check_project, this);
-                         }
-                    } else if (zitems[1].revents & ZMQ_POLLIN) {
-                         if (!zmqcheck(this->conf->log, i = zmq_recv(zrunner, buffer, n, 0), error)) {
+                         if (!zmqcheck(this->conf->log, zmq_msg_init(&msg), error) ||
+                             !zmqcheck(this->conf->log, n = zmq_msg_recv(&msg, zworker_check, 0), error)) {
                               this->running = false;
                          } else {
-                              buffer[i] = '\0';
-                              message = yacad_message_unserialize(this->conf->log, buffer, NULL);
-                              if (message == NULL) {
-                                   this->conf->log(warn, "Received invalid message: %s", buffer);
+                              if (n > 0) {
+                                   if (c < n) {
+                                        if (c == 0) {
+                                             strmsg = malloc(c = 4096);
+                                        } else {
+                                             do {
+                                                  c *= 2;
+                                             } while (c < n);
+                                             strmsg = realloc(strmsg, c);
+                                        }
+                                   }
+                                   memcpy(strmsg, zmq_msg_data(&msg), n);
+                                   zmqcheck(this->conf->log, zmq_msg_close(&msg), warn);
+                                   strmsg[n] = '\0';
+                                   if (!strcmp(strmsg, MSG_STOP)) {
+                                        this->running = false;
+                                   } else if (!strcmp(strmsg, MSG_CHECK)) {
+                                        this->conf->log(debug, "Checking projects");
+                                        projects = this->conf->get_projects(this->conf);
+                                        projects->iterate(projects, (cad_hash_iterator_fn)iterate_check_project, this);
+                                   }
                               } else {
-                                   message->accept(message, I(&v));
-                                   message->free(message);
+                                   zmqcheck(this->conf->log, zmq_msg_close(&msg), warn);
+                              }
+                         }
+                    } else if (zitems[1].revents & ZMQ_POLLIN) {
+                         if (!zmqcheck(this->conf->log, zmq_msg_init(&msg), error) ||
+                             !zmqcheck(this->conf->log, n = zmq_msg_recv(&msg, zrunner, 0), error)) {
+                              this->running = false;
+                         } else {
+                              if (n > 0) {
+                                   if (c < n) {
+                                        if (c == 0) {
+                                             strmsg = malloc(c = 4096);
+                                        } else {
+                                             do {
+                                                  c *= 2;
+                                             } while (c < n);
+                                             strmsg = realloc(strmsg, c);
+                                        }
+                                   }
+                                   memcpy(strmsg, zmq_msg_data(&msg), n);
+                                   zmqcheck(this->conf->log, zmq_msg_close(&msg), warn);
+                                   strmsg[n] = '\0';
+                                   message = yacad_message_unserialize(this->conf->log, strmsg, NULL);
+                                   if (message == NULL) {
+                                        this->conf->log(warn, "Received invalid message: %s", strmsg);
+                                   } else {
+                                        message->accept(message, I(&v));
+                                        message->free(message);
+                                   }
+                              } else {
+                                   zmqcheck(this->conf->log, zmq_msg_close(&msg), warn);
                               }
                          }
                     }
@@ -298,6 +335,7 @@ static void run(yacad_scheduler_impl_t *this) {
           zmqcheck(this->conf->log, zmq_close(zworker_run), warn);
           zmqcheck(this->conf->log, zmq_close(zworker_check), warn);
           zmqcheck(this->conf->log, zmq_close(zrunner), warn);
+          free(strmsg);
      }
 }
 
