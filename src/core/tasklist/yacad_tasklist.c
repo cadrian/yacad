@@ -98,7 +98,7 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
 
           rid = runnerid->serialize(runnerid);
 
-          if (sqlcheck(this->db, this->log, sqlite3_prepare_v2(this->db, STMT_INSERT, -1, &query, NULL), warn)) {
+          if (sqlcheck(this->db, this->log, sqlite3_prepare_v2(this->db, STMT_INSERT, -1, &query, NULL), error)) {
                sqlcheck(this->db, this->log, sqlite3_bind_int64(query, 1, (sqlite3_int64)timestamp), warn);
                sqlcheck(this->db, this->log, sqlite3_bind_int(query, 2, (int)status), warn);
                sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 3, src, strlen(src), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
@@ -191,7 +191,7 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
 
      if (!init) {
           if (!sqlcheck(NULL, log, sqlite3_initialize(), debug)) {
-               log(warn, "Could not initialize database: %s", database_name);
+               log(error, "Could not initialize database: %s", database_name);
                return NULL;
           }
           init = true;
@@ -199,11 +199,11 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
 
      if (!sqlcheck(NULL, log, sqlite3_open_v2(database_name, &db, SQLITE_OPEN_READWRITE, NULL), debug)) {
           if (!sqlcheck(NULL, log, sqlite3_open_v2(database_name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL), debug)) {
-               log(warn, "Could not create database: %s", database_name);
+               log(error, "Could not create database: %s", database_name);
                return NULL;
           }
           if (!sqlcheck(db, log, sqlite3_exec(db, STMT_CREATE_TABLE, NULL, NULL, NULL), debug)) {
-               log(warn, "Could not create table");
+               log(error, "Could not create table");
                sqlite3_close(db);
                return NULL;
           }
@@ -215,7 +215,7 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
      result->tasklist = cad_new_array(stdlib_memory, sizeof(yacad_task_t*));
      result->db = db;
 
-     if (sqlcheck(db, log, sqlite3_prepare_v2(db, STMT_SELECT, -1, &query, NULL), warn)) {
+     if (sqlcheck(db, log, sqlite3_prepare_v2(db, STMT_SELECT, -1, &query, NULL), error)) {
           sqlcheck(db, log, sqlite3_bind_int(query, 1, (int)task_new), warn);
           do {
                err = sqlite3_step(query);
@@ -238,7 +238,7 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
                              sqlite3_column_text(query, 5));
                     break;
                default:
-                    sqlcheck(db, log, err, warn);
+                    sqlcheck(db, log, err, error);
                     done = true;
                }
           } while (!done);

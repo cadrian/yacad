@@ -47,11 +47,11 @@ static void stop(yacad_scheduler_impl_t *this) {
      void *zcontext = get_zmq_context();
      void *zworker = zmq_socket(zcontext, ZMQ_PAIR);
      if (zworker != NULL) {
-          if (zmqcheck(this->conf->log, zmq_connect(zworker, INPROC_RUN_ADDRESS), warn)) {
-               zmqcheck(this->conf->log, zmq_send(zworker, MSG_STOP, strlen(MSG_STOP), 0), warn);
-               zmqcheck(this->conf->log, zmq_disconnect(zworker, INPROC_RUN_ADDRESS), warn);
+          if (zmqcheck(this->conf->log, zmq_connect(zworker, INPROC_RUN_ADDRESS), error)) {
+               zmqcheck(this->conf->log, zmq_send(zworker, MSG_STOP, strlen(MSG_STOP), 0), error);
+               zmqcheck(this->conf->log, zmq_disconnect(zworker, INPROC_RUN_ADDRESS), error);
           }
-          zmqcheck(this->conf->log, zmq_close(zworker), warn);
+          zmqcheck(this->conf->log, zmq_close(zworker), error);
      }
      this->running = false;
 }
@@ -101,12 +101,12 @@ static void *worker_routine(yacad_scheduler_impl_t *this) {
      set_thread_name("schedule worker");
 
      if (zscheduler_run == NULL || zscheduler_check == NULL) {
-          this->conf->log(warn, "Invalid 0MQ scheduler sockets");
+          this->conf->log(error, "Invalid 0MQ scheduler sockets");
           this->conf->log(debug, "zscheduler_run=%p zscheduler_check=%p", zscheduler_run, zscheduler_check);
      } else {
-          if (zmqcheck(this->conf->log, zmq_bind(zscheduler_run, INPROC_RUN_ADDRESS), warn)) {
+          if (zmqcheck(this->conf->log, zmq_bind(zscheduler_run, INPROC_RUN_ADDRESS), error)) {
                do {
-                    if (!zmqcheck(this->conf->log, i = zmq_recv(zscheduler_run, buffer, n, 0), warn)) {
+                    if (!zmqcheck(this->conf->log, i = zmq_recv(zscheduler_run, buffer, n, 0), error)) {
                          this->conf->log(debug, "Not running scheduler worker!!!");
                          break; // running stays false
                     } else if (!strncmp(buffer, MSG_START, i)) {
@@ -114,7 +114,7 @@ static void *worker_routine(yacad_scheduler_impl_t *this) {
                     }
                } while (!running);
 
-               if (zmqcheck(this->conf->log, zmq_connect(zscheduler_check, INPROC_CHECK_ADDRESS), warn)) {
+               if (zmqcheck(this->conf->log, zmq_connect(zscheduler_check, INPROC_CHECK_ADDRESS), error)) {
                     while (running) {
                          confgen = this->conf->generation(this->conf);
                          if (check || confgen != this->worker_next_check.confgen) {
@@ -132,7 +132,7 @@ static void *worker_routine(yacad_scheduler_impl_t *this) {
                          if (!zmqcheck(this->conf->log, zmq_poll(zitems, 1, timeout * 1000L), debug)) {
                               running = false;
                          } else if (zitems[0].revents & ZMQ_POLLIN) {
-                              if (!zmqcheck(this->conf->log, i = zmq_recv(zscheduler_run, buffer, n, 0), warn)) {
+                              if (!zmqcheck(this->conf->log, i = zmq_recv(zscheduler_run, buffer, n, 0), error)) {
                                    running = false;
                               } else if (!strncmp(buffer, MSG_STOP, i)) {
                                    running = false;
@@ -255,11 +255,11 @@ static void run(yacad_scheduler_impl_t *this) {
      yacad_message_t *message;
 
      if (zworker_check != NULL && zworker_run != NULL && zrunner != NULL) {
-          if (zmqcheck(this->conf->log, zmq_bind(zworker_check, INPROC_CHECK_ADDRESS), warn)
-              && zmqcheck(this->conf->log, zmq_bind(zrunner, this->conf->get_endpoint_name(this->conf)), warn)) {
+          if (zmqcheck(this->conf->log, zmq_bind(zworker_check, INPROC_CHECK_ADDRESS), error)
+              && zmqcheck(this->conf->log, zmq_bind(zrunner, this->conf->get_endpoint_name(this->conf)), error)) {
 
-               if (zmqcheck(this->conf->log, zmq_connect(zworker_run, INPROC_RUN_ADDRESS), warn)) {
-                    if (zmqcheck(this->conf->log, zmq_send(zworker_run, MSG_START, strlen(MSG_START), 0), warn)) {
+               if (zmqcheck(this->conf->log, zmq_connect(zworker_run, INPROC_RUN_ADDRESS), error)) {
+                    if (zmqcheck(this->conf->log, zmq_send(zworker_run, MSG_START, strlen(MSG_START), 0), error)) {
                          this->running = true;
                     }
                     zmqcheck(this->conf->log, zmq_disconnect(zworker_run, INPROC_RUN_ADDRESS), warn);
@@ -269,7 +269,7 @@ static void run(yacad_scheduler_impl_t *this) {
                     if (!zmqcheck(this->conf->log, zmq_poll(zitems, 2, -1), debug)) {
                          this->running = false;
                     } else if (zitems[0].revents & ZMQ_POLLIN) {
-                         if (!zmqcheck(this->conf->log, i = zmq_recv(zworker_check, buffer, n, 0), warn)) {
+                         if (!zmqcheck(this->conf->log, i = zmq_recv(zworker_check, buffer, n, 0), error)) {
                               this->running = false;
                          } else if (!strncmp(buffer, MSG_STOP, i)) {
                               this->running = false;
@@ -279,7 +279,9 @@ static void run(yacad_scheduler_impl_t *this) {
                               projects->iterate(projects, (cad_hash_iterator_fn)iterate_check_project, this);
                          }
                     } else if (zitems[1].revents & ZMQ_POLLIN) {
-                         if (!zmqcheck(this->conf->log, i = zmq_recv(zrunner, buffer, n, 0), warn)) {
+                         if (!zmqcheck(this->conf->log, i = zmq_recv(zrunner, buffer, n, 0), error)) {
+                              this->running = false;
+                         } else {
                               buffer[i] = '\0';
                               message = yacad_message_unserialize(this->conf->log, buffer, NULL);
                               if (message == NULL) {

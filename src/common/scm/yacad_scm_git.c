@@ -86,7 +86,7 @@ static void fill_env(yacad_scm_git_t *this, cad_hash_t *env){
      size_t szheads = 0;
      char ref[GIT_OID_HEXSZ + 1];
 
-     if (gitcheck(this->log, git_remote_ls(&heads, &szheads, this->remote), warn) && szheads > 0) {
+     if (gitcheck(this->log, git_remote_ls(&heads, &szheads, this->remote), error) && szheads > 0) {
           // The first one is HEAD
           git_oid_tostr(ref, GIT_OID_HEXSZ + 1, &heads[0]->oid);
      }
@@ -102,14 +102,14 @@ static bool_t check(yacad_scm_git_t *this) {
      bool_t result = false;
      bool_t downloaded;
 
-     if (!gitcheck(this->log, git_remote_connect(this->remote, GIT_DIRECTION_FETCH), warn)) {
+     if (!gitcheck(this->log, git_remote_connect(this->remote, GIT_DIRECTION_FETCH), error)) {
           // Could not connect to remote
      } else {
           this->fetch_percent = this->index_percent = -1;
           downloaded = gitcheck(this->log, git_remote_download(this->remote), warn);
           git_remote_disconnect(this->remote);
           if (downloaded) {
-               if (!gitcheck(this->log, git_remote_update_tips(this->remote, NULL, NULL), warn)) {
+               if (!gitcheck(this->log, git_remote_update_tips(this->remote, NULL, NULL), error)) {
                     // Could not update tips
                } else if (this->fetch_percent == -1 && this->index_percent == -1) {
                     this->log(debug, "Remote is up-to-date: %s", this->upstream_url);
@@ -179,7 +179,7 @@ yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_value_t
      u->visit(u, (json_value_t *)desc);
      jurl = u->get_string(u);
      if (jurl == NULL) {
-          log(warn, "No upstream url");
+          log(error, "No upstream url");
           goto error;
      }
      szurl = jurl->utf8(jurl, "", 0) + 1;
@@ -205,18 +205,18 @@ yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_value_t
 
      if (gitcheck(log, git_repository_open_bare(&(result->repo), result->root_path), debug)) {
           if (gitcheck(log, git_remote_load(&(result->remote), result->repo, REMOTE_NAME), debug)) {
-               if (!gitcheck(log, git_remote_delete(result->remote), warn)) {
+               if (!gitcheck(log, git_remote_delete(result->remote), error)) {
                     goto error;
                }
                git_remote_free(result->remote);
           }
      } else {
           log(info, "Initializing repository: %s", result->root_path);
-          if (!gitcheck(log, git_repository_init(&(result->repo), result->root_path, true), warn)) {
+          if (!gitcheck(log, git_repository_init(&(result->repo), result->root_path, true), error)) {
                goto error;
           }
      }
-     if (!gitcheck(log, git_remote_create(&(result->remote), result->repo, REMOTE_NAME, upstream_url), warn)) {
+     if (!gitcheck(log, git_remote_create(&(result->remote), result->repo, REMOTE_NAME, upstream_url), error)) {
           goto error;
      }
 
@@ -224,7 +224,7 @@ yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_value_t
      callbacks.transfer_progress = (git_transfer_progress_cb)yacad_git_transfer_progress;
      callbacks.credentials  = (git_cred_acquire_cb)yacad_git_credentials;
      callbacks.payload = result;
-     if (!gitcheck(log, git_remote_set_callbacks(result->remote, &callbacks), warn)) {
+     if (!gitcheck(log, git_remote_set_callbacks(result->remote, &callbacks), error)) {
           goto error;
      }
 

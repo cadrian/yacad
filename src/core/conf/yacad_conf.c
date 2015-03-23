@@ -124,7 +124,9 @@ static void set_logger(yacad_conf_impl_t *this) {
           n = jlevel->count(jlevel) + 1;
           level = alloca(n);
           i = jlevel->utf8(jlevel, level, n);
-          if (!strncmp("warn", level, i)) {
+          if (!strncmp("error", level, i)) {
+               this->fn.log = get_logger(error);
+          } else if (!strncmp("warn", level, i)) {
                this->fn.log = get_logger(warn);
           } else if (!strncmp("info", level, i)) {
                this->fn.log = get_logger(info);

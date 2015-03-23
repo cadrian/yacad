@@ -45,10 +45,14 @@ int main(int argc, const char * const *argv) {
      action.sa_flags = 0;
      sigemptyset(&action.sa_mask);
      if (sigaction(SIGINT, &action, NULL) < 0) {
-          conf->log(warn, "Could not set SIGINT action handler");
+          conf->log(error, "Could not set SIGINT action handler");
+          del_zmq_context();
+          exit(1);
      }
      if (sigaction(SIGTERM, &action, NULL) < 0) {
-          conf->log(warn, "Could not set SIGTERM action handler");
+          conf->log(error, "Could not set SIGTERM action handler");
+          del_zmq_context();
+          exit(1);
      }
 
      scheduler = yacad_scheduler_new(conf);
