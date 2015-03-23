@@ -100,12 +100,12 @@ static char *serialize(yacad_task_impl_t *this) {
 
      n = 1 + snprintf(
           "", 0,
-          "{\"id\":%lu,\"timestamp\":%lu,\"status\":%d,\"taskindex\":%d,\"task\":%s\"project_name\":\"%s\",\"env\":%s}",
+          "{\"id\":%lu,\"timestamp\":%lu,\"status\":%d,\"taskindex\":%d,\"task\":%s,\"project_name\":\"%s\",\"env\":%s}",
           this->id, (unsigned long)this->timestamp, (int)this->status, this->taskindex, stask, this->project_name, senv);
      result = malloc(n);
      snprintf(
           result, n,
-          "{\"id\":%lu,\"timestamp\":%lu,\"status\":%d,\"taskindex\":%d,\"task\":%s\"project_name\":\"%s\",\"env\":%s}",
+          "{\"id\":%lu,\"timestamp\":%lu,\"status\":%d,\"taskindex\":%d,\"task\":%s,\"project_name\":\"%s\",\"env\":%s}",
           this->id, (unsigned long)this->timestamp, (int)this->status, this->taskindex, stask, this->project_name, senv);
 
      jenv->accept(jenv, json_kill());
