@@ -59,7 +59,7 @@ static void free_(yacad_message_reply_get_task_impl_t *this) {
           this->runnerid->free(this->runnerid);
           this->scm->free(this->scm);
           this->task->free(this->task);
-          this->serial->free(this->serial);
+          this->serial->accept(this->serial, json_kill());
      }
      free(this);
 }
@@ -109,9 +109,9 @@ yacad_message_reply_get_task_t *yacad_message_reply_get_task_unserialize(logger_
      json_output_stream_t *out_task = new_json_output_stream_from_string(&stask, stdlib_memory);
      json_visitor_t *wtask = json_write_to(out_task, stdlib_memory, 0);
 
-     v->visit(v, jserial, "runner");
      result->fn = impl_fn;
      result->serial = t->resolve(t, jserial);
+     v->visit(v, result->serial, "runner");
      result->runnerid = yacad_runnerid_new(log, v->get_value(v));
      v->visit(v, result->serial, "scm");
      result->scm = yacad_scm_new(log, v->get_value(v), root_path);

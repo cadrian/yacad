@@ -26,10 +26,14 @@ typedef struct yacad_tasklist_s yacad_tasklist_t;
 typedef void (*yacad_tasklist_add_fn)(yacad_tasklist_t *this, yacad_task_t *task);
 typedef void (*yacad_tasklist_free_fn)(yacad_tasklist_t *this);
 typedef yacad_task_t *(*yacad_tasklist_get_fn)(yacad_tasklist_t *this, yacad_runnerid_t *runnerid);
+typedef void (*yacad_tasklist_set_task_aborted_fn)(yacad_tasklist_t *this, yacad_task_t *task);
+typedef void (*yacad_tasklist_set_task_done_fn)(yacad_tasklist_t *this, yacad_task_t *task);
 
 struct yacad_tasklist_s {
      yacad_tasklist_add_fn add;
      yacad_tasklist_get_fn get;
+     yacad_tasklist_set_task_aborted_fn set_task_aborted;
+     yacad_tasklist_set_task_done_fn set_task_done;
      yacad_tasklist_free_fn free;
 };
 

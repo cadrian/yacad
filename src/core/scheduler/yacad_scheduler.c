@@ -224,7 +224,30 @@ static void visit_reply_get_task(yacad_scheduler_message_visitor_t *this, yacad_
 }
 
 static void visit_query_set_result(yacad_scheduler_message_visitor_t *this, yacad_message_query_set_result_t *message) {
-     this->scheduler->conf->log(warn, "Not yet implemented"); // TODO
+     yacad_runnerid_t *runnerid = message->get_runnerid(message);
+     yacad_task_t *task = message->get_task(message), *next_task;
+     cad_hash_t *projects;
+     yacad_project_t *project;
+
+     if (runnerid == NULL) {
+          this->scheduler->conf->log(warn, "Missing runnerid");
+     } else if (task == NULL) {
+          this->scheduler->conf->log(warn, "Missing task");
+     } else {
+          projects = this->scheduler->conf->get_projects(this->scheduler->conf);
+          project = projects->get(projects, task->get_project_name(task));
+          if (project == NULL) {
+               this->scheduler->conf->log(warn, "Unknown project: %s", task->get_project_name(task));
+          } else if (!message->is_successful(message)) {
+               this->scheduler->tasklist->set_task_aborted(this->scheduler->tasklist, task);
+          } else {
+               this->scheduler->tasklist->set_task_done(this->scheduler->tasklist, task);
+               next_task = project->next_task(project, task);
+               if (next_task != NULL) {
+                    this->scheduler->tasklist->add(this->scheduler->tasklist, next_task);
+               }
+          }
+     }
 }
 
 static void visit_reply_set_result(yacad_scheduler_message_visitor_t *this, yacad_message_reply_set_result_t *message) {

@@ -26,7 +26,7 @@
 
 #define STMT_SELECT "select ID, STATUS, SERIAL from TASKLIST where STATUS=? order by ID asc"
 #define STMT_INSERT "insert into TASKLIST (STATUS, SERIAL) values (?,?)"
-#define STMT_UPDATE "update TASKLIST set STATUS=? where ID = ?"
+#define STMT_UPDATE "update TASKLIST set STATUS=? where ID=?"
 
 typedef struct yacad_tasklist_impl_s {
      yacad_tasklist_t fn;
@@ -115,6 +115,31 @@ static yacad_task_t *get(yacad_tasklist_impl_t *this, yacad_runnerid_t *runnerid
      return result;
 }
 
+static void update_task_status(yacad_tasklist_impl_t *this, yacad_task_t *task, yacad_task_status_t status) {
+     sqlite3_stmt *query = NULL;
+     char *serial;
+     unsigned long id = task->get_id(task);
+
+     if (sqlcheck(this->db, this->log, sqlite3_prepare_v2(this->db, STMT_UPDATE, -1, &query, NULL), error)) {
+          sqlcheck(this->db, this->log, sqlite3_bind_int(query, 1, (int)status), warn);
+          sqlcheck(this->db, this->log, sqlite3_bind_int64(query, 1, (sqlite3_int64)id), warn);
+          sqlite3_step(query);
+          sqlcheck(this->db, this->log, sqlite3_finalize(query), warn);
+
+          serial = task->serialize(task);
+          this->log(info, "Updated task: %s", serial);
+          free(serial);
+     }
+}
+
+static void set_task_aborted(yacad_tasklist_impl_t *this, yacad_task_t *task) {
+     update_task_status(this, task, task_aborted);
+}
+
+static void set_task_done(yacad_tasklist_impl_t *this, yacad_task_t *task) {
+     update_task_status(this, task, task_done);
+}
+
 static void free_(yacad_tasklist_impl_t *this) {
      int i, n = this->tasklist->count(this->tasklist);
      yacad_task_t *task;
@@ -132,6 +157,8 @@ static void free_(yacad_tasklist_impl_t *this) {
 static yacad_tasklist_t impl_fn = {
      .add = (yacad_tasklist_add_fn)add,
      .get = (yacad_tasklist_get_fn)get,
+     .set_task_aborted = (yacad_tasklist_set_task_aborted_fn)set_task_aborted,
+     .set_task_done = (yacad_tasklist_set_task_done_fn)set_task_done,
      .free = (yacad_tasklist_free_fn)free_,
 };
 
