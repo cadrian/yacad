@@ -28,8 +28,12 @@ static void accept(yacad_message_query_get_task_impl_t *this, yacad_message_visi
 }
 
 static char *serialize(yacad_message_query_get_task_impl_t *this) {
-     const char *result = this->runnerid->serialize(this->runnerid);
-     return strdup(result);
+     char *result = NULL;
+     const char *runnerid = this->runnerid->serialize(this->runnerid);
+     int n = snprintf("", 0, "{\"type\":\"query_get_task\",\"runner\":%s}", runnerid) + 1;
+     result = malloc(n);
+     snprintf(result, n, "{\"type\":\"query_get_task\",\"runner\":%s}", runnerid);
+     return result;
 }
 
 static void free_(yacad_message_query_get_task_impl_t *this) {

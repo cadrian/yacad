@@ -125,6 +125,10 @@ static bool_t check(yacad_scm_git_t *this) {
      return result;
 }
 
+static json_value_t *get_desc(yacad_scm_git_t *this) {
+     return this->desc;
+}
+
 static void free_(yacad_scm_git_t *this) {
      git_remote_free(this->remote);
      git_repository_free(this->repo);
@@ -164,6 +168,7 @@ static int yacad_git_credentials(git_cred **out, const char *url, const char *us
 static yacad_scm_t git_fn = {
      .check = (yacad_scm_check_fn)check,
      .fill_env = (yacad_scm_fill_env_fn)fill_env,
+     .get_desc = (yacad_scm_get_desc_fn)get_desc,
      .free = (yacad_scm_free_fn)free_,
 };
 

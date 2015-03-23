@@ -32,8 +32,26 @@ static void accept(yacad_message_reply_get_task_impl_t *this, yacad_message_visi
 }
 
 static char *serialize(yacad_message_reply_get_task_impl_t *this) {
-     const char *result = this->runnerid->serialize(this->runnerid);
-     return strdup(result);
+     char *result = NULL;
+     const char *runnerid = this->runnerid->serialize(this->runnerid);
+     char *task = this->task->serialize(this->task);
+     json_value_t *scm_desc = this->scm->get_desc(this->scm);
+     char *scm;
+     json_output_stream_t *scm_out = new_json_output_stream_from_string(&scm, stdlib_memory);
+     json_visitor_t *wscm = json_write_to(scm_out, stdlib_memory, 0);
+     int n;
+
+     scm_desc->accept(scm_desc, wscm);
+
+     n = snprintf("", 0, "{\"type\":\"reply_get_task\",\"runner\":%s,\"task\":%s,\"scm\":%s}", runnerid, task, scm) + 1;
+     result = malloc(n);
+     snprintf(result, n, "{\"type\":\"reply_get_task\",\"runner\":%s,\"task\":%s,\"scm\":%s}", runnerid, task, scm);
+
+     wscm->free(wscm);
+     scm_out->free(scm_out);
+     free(task);
+
+     return result;
 }
 
 static void free_(yacad_message_reply_get_task_impl_t *this) {
@@ -85,8 +103,11 @@ yacad_message_reply_get_task_t *yacad_message_reply_get_task_unserialize(logger_
      yacad_message_reply_get_task_impl_t *result = malloc(sizeof(yacad_message_reply_get_task_impl_t));
      yacad_json_finder_t *v = yacad_json_finder_new(log, json_type_object, "%s");
      yacad_json_template_t *t = yacad_json_template_new(log, NULL);
-     json_value_t *task_run, *task_source;
+     json_value_t *task;
      char *root_path = env->get(env, "root_path");
+     char *stask;
+     json_output_stream_t *out_task = new_json_output_stream_from_string(&stask, stdlib_memory);
+     json_visitor_t *wtask = json_write_to(out_task, stdlib_memory, 0);
 
      v->visit(v, jserial, "runner");
      result->fn = impl_fn;
@@ -94,11 +115,16 @@ yacad_message_reply_get_task_t *yacad_message_reply_get_task_unserialize(logger_
      result->runnerid = yacad_runnerid_new(log, v->get_value(v));
      v->visit(v, result->serial, "scm");
      result->scm = yacad_scm_new(log, v->get_value(v), root_path);
-     v->visit(v, result->serial, "task/run");
-     task_run = v->get_value(v);
-     v->visit(v, result->serial, "task/source");
-     task_source = v->get_value(v);
-     result->task = yacad_task_restore(log, 0UL, (time_t)0, task_new, task_run, task_source, result->runnerid, NULL, 0); // TODO replace all that with getting the right task from the tasklist (we must know the task id)
+     v->visit(v, result->serial, "task");
+     task = v->get_value(v);
+
+     task->accept(task, wtask);
+
+     result->task = yacad_task_unserialize(log, stask);
+
+     wtask->free(wtask);
+     out_task->free(out_task);
+     free(stask);
 
      I(t)->free(I(t));
      I(v)->free(I(v));

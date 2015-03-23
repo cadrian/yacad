@@ -23,11 +23,13 @@ typedef struct yacad_scm_s yacad_scm_t;
 
 typedef bool_t (*yacad_scm_check_fn)(yacad_scm_t *this);
 typedef void (*yacad_scm_fill_env_fn)(yacad_scm_t *this, cad_hash_t *env);
+typedef json_value_t *(*yacad_scm_get_desc_fn)(yacad_scm_t *this);
 typedef void (*yacad_scm_free_fn)(yacad_scm_t *this);
 
 struct yacad_scm_s {
      yacad_scm_check_fn check;
      yacad_scm_fill_env_fn fill_env;
+     yacad_scm_get_desc_fn get_desc;
      yacad_scm_free_fn free;
 };
 

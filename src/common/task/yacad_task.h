@@ -41,6 +41,7 @@ typedef const char *(*yacad_task_get_project_name_fn)(yacad_task_t *this);
 typedef int (*yacad_task_get_taskindex_fn)(yacad_task_t *this);
 typedef void (*yacad_task_set_taskindex_fn)(yacad_task_t *this, int index);
 typedef cad_hash_t *(*yacad_task_get_env_fn)(yacad_task_t *this);
+typedef char *(*yacad_task_serialize_fn)(yacad_task_t *this);
 typedef bool_t (*yacad_task_same_as_fn)(yacad_task_t *this, yacad_task_t *other);
 typedef void (*yacad_task_free_fn)(yacad_task_t *this);
 
@@ -57,11 +58,12 @@ struct yacad_task_s {
      yacad_task_get_taskindex_fn get_taskindex;
      yacad_task_set_taskindex_fn set_taskindex;
      yacad_task_get_env_fn get_env;
+     yacad_task_serialize_fn serialize;
      yacad_task_same_as_fn same_as;
      yacad_task_free_fn free;
 };
 
-yacad_task_t *yacad_task_restore(logger_t log, unsigned long id, time_t timestamp, yacad_task_status_t status, json_value_t *run, json_value_t *source, yacad_runnerid_t *runnerid, const char *project_name, int taskindex);
+yacad_task_t *yacad_task_unserialize(logger_t log, char *serial);
 yacad_task_t *yacad_task_new(logger_t log, json_value_t *task, cad_hash_t *env, const char *project_name, int taskindex);
 
 #endif /* __YACAD_TASK_H__ */
