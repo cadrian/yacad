@@ -214,6 +214,7 @@ static void visit_query_get_task(yacad_scheduler_message_visitor_t *this, yacad_
           } else {
                this->scheduler->conf->log(info, "Sending task %lu to runnerid: %s", task->get_id(task), runnerid->serialize(runnerid));
                send_task(this->scheduler, task, this->zrunner);
+               task->set_status(task, task_running);
           }
      }
 }

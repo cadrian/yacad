@@ -48,7 +48,7 @@ static yacad_task_t *check(yacad_project_impl_t *this) {
      cad_hash_t *env = cad_new_hash(stdlib_memory, cad_hash_strings);
      if (this->scm->check(this->scm)) {
           this->scm->fill_env(this->scm, env);
-          result = yacad_task_new(this->log, this->tasks->get(this->tasks, this->taskindex), env);
+          result = yacad_task_new(this->log, this->tasks->get(this->tasks, this->taskindex), env, this->name);
      }
      env->clean(env, (cad_hash_iterator_fn)env_cleaner, this);
      env->free(env);

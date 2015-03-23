@@ -24,6 +24,7 @@ typedef struct yacad_task_s yacad_task_t;
 
 typedef enum {
      task_new=0,
+     task_running=1,
      task_done=-1,
      task_aborted=-2,
 } yacad_task_status_t;
@@ -36,6 +37,7 @@ typedef void (*yacad_task_set_status_fn)(yacad_task_t *this, yacad_task_status_t
 typedef json_value_t *(*yacad_task_get_source_fn)(yacad_task_t *this);
 typedef json_value_t *(*yacad_task_get_run_fn)(yacad_task_t *this);
 typedef yacad_runnerid_t *(*yacad_task_get_runnerid_fn)(yacad_task_t *this);
+typedef const char *(*yacad_task_get_project_name_fn)(yacad_task_t *this);
 typedef bool_t (*yacad_task_same_as_fn)(yacad_task_t *this, yacad_task_t *other);
 typedef void (*yacad_task_free_fn)(yacad_task_t *this);
 
@@ -48,11 +50,12 @@ struct yacad_task_s {
      yacad_task_get_source_fn get_source;
      yacad_task_get_run_fn get_run;
      yacad_task_get_runnerid_fn get_runnerid;
+     yacad_task_get_project_name_fn get_project_name;
      yacad_task_same_as_fn same_as;
      yacad_task_free_fn free;
 };
 
-yacad_task_t *yacad_task_restore(logger_t log, unsigned long id, time_t timestamp, yacad_task_status_t status, json_value_t *run, json_value_t *source, yacad_runnerid_t *runnerid);
-yacad_task_t *yacad_task_new(logger_t log, json_value_t *task, cad_hash_t *env);
+yacad_task_t *yacad_task_restore(logger_t log, unsigned long id, time_t timestamp, yacad_task_status_t status, json_value_t *run, json_value_t *source, yacad_runnerid_t *runnerid, const char *project_name);
+yacad_task_t *yacad_task_new(logger_t log, json_value_t *task, cad_hash_t *env, const char *project_name);
 
 #endif /* __YACAD_TASK_H__ */

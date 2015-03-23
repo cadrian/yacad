@@ -24,11 +24,12 @@
      "STATUS integer not null, "                         \
      "SOURCE not null,"                                  \
      "RUN not null,"                                     \
-     "RUNNERID not null"                                 \
+     "RUNNERID not null,"                                \
+     "PROJECT not null"                                  \
      ")"
 
-#define STMT_SELECT "select ID, TIMESTAMP, STATUS, SOURCE, RUN, RUNNERID from TASKLIST where STATUS=? order by ID asc"
-#define STMT_INSERT "insert into TASKLIST (TIMESTAMP, STATUS, SOURCE, RUN, RUNNERID) values (?,?,?,?,?)"
+#define STMT_SELECT "select ID, TIMESTAMP, STATUS, SOURCE, RUN, RUNNERID, PROJECT from TASKLIST where STATUS=? order by ID asc"
+#define STMT_INSERT "insert into TASKLIST (TIMESTAMP, STATUS, SOURCE, RUN, RUNNERID, PROJECT) values (?,?,?,?,?,?)"
 #define STMT_UPDATE "update TASKLIST set STATUS=? where ID = ?"
 
 typedef struct yacad_tasklist_impl_s {
@@ -71,6 +72,7 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
      char *src;
      char *run;
      const char *rid;
+     const char *prj;
      time_t timestamp = task->get_timestamp(task);
      yacad_task_status_t status = task->get_status(task);
      json_output_stream_t *out;
@@ -98,18 +100,21 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
 
           rid = runnerid->serialize(runnerid);
 
+          prj = task->get_project_name(task);
+
           if (sqlcheck(this->db, this->log, sqlite3_prepare_v2(this->db, STMT_INSERT, -1, &query, NULL), error)) {
                sqlcheck(this->db, this->log, sqlite3_bind_int64(query, 1, (sqlite3_int64)timestamp), warn);
                sqlcheck(this->db, this->log, sqlite3_bind_int(query, 2, (int)status), warn);
                sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 3, src, strlen(src), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
                sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 4, run, strlen(run), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
                sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 5, rid, strlen(rid), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
+               sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 6, prj, strlen(prj), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
                sqlite3_step(query);
                task->set_id(task, (unsigned long)sqlite3_last_insert_rowid(this->db));
                sqlcheck(this->db, this->log, sqlite3_finalize(query), warn);
           }
 
-          this->log(info, "Added task: {\"id\":%lu,\"runnerid\":%s,\"source\":%s,\"run\":%s}", task->get_id(task), rid, src, run);
+          this->log(info, "Added task: {\"id\":%lu,\"runnerid\":%s,\"source\":%s,\"run\":%s,\"project\":\"%s\"}", task->get_id(task), rid, src, run, prj);
           this->tasklist->insert(this->tasklist, n, &task);
 
           free(src);
@@ -124,11 +129,13 @@ static yacad_task_t *get(yacad_tasklist_impl_t *this, yacad_runnerid_t *runnerid
      yacad_runnerid_t *task_runnerid;
      for (index = 0; result == NULL && index < count; index++) {
           task = *(yacad_task_t **)this->tasklist->get(this->tasklist, index);
-          task_runnerid = task->get_runnerid(task);
-          match = runnerid->match(runnerid, task_runnerid);
-          if (match > best_match) {
-               best_match = match;
-               best_index = index;
+          if (task->get_status(task) == task_new) {
+               task_runnerid = task->get_runnerid(task);
+               match = runnerid->match(runnerid, task_runnerid);
+               if (match > best_match) {
+                    best_match = match;
+                    best_index = index;
+               }
           }
      }
      if (best_match >= 0) {
@@ -158,7 +165,9 @@ static yacad_tasklist_t impl_fn = {
      .free = (yacad_tasklist_free_fn)free_,
 };
 
-static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, sqlite3_int64 sql_timestamp, int sql_status, const unsigned char *sql_source, const unsigned char *sql_run, const unsigned char *sql_runnerid) {
+static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, sqlite3_int64 sql_timestamp, int sql_status,
+                     const unsigned char *sql_source, const unsigned char *sql_run, const unsigned char *sql_runnerid,
+                     const unsigned char *sql_project) {
      yacad_task_t *task;
      json_value_t *jrun;
      json_value_t *jsource;
@@ -175,10 +184,10 @@ static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, sqlite3_
 
      runnerid = yacad_runnerid_unserialize(this->log, (char*)sql_runnerid);
 
-     task = yacad_task_restore(this->log, (unsigned long)sql_id, (time_t)sql_timestamp, (yacad_task_status_t)sql_status, jrun, jsource, runnerid);
+     task = yacad_task_restore(this->log, (unsigned long)sql_id, (time_t)sql_timestamp, (yacad_task_status_t)sql_status, jrun, jsource, runnerid, (char*)sql_project);
 
      this->tasklist->insert(this->tasklist, this->tasklist->count(this->tasklist), &task);
-     this->log(info, "Restored task: {\"id\":%lu,\"runnerid\":%s,\"source\":%s,\"run\":%s}", (unsigned long)sql_id, sql_runnerid, sql_source, sql_run);
+     this->log(info, "Restored task: {\"id\":%lu,\"runnerid\":%s,\"source\":%s,\"run\":%s,\"project\":\"%s\"}", (unsigned long)sql_id, sql_runnerid, sql_source, sql_run, sql_project);
 }
 
 yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
@@ -235,7 +244,8 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
                              sqlite3_column_int(query, 2),
                              sqlite3_column_text(query, 3),
                              sqlite3_column_text(query, 4),
-                             sqlite3_column_text(query, 5));
+                             sqlite3_column_text(query, 5),
+                             sqlite3_column_text(query, 6));
                     break;
                default:
                     sqlcheck(db, log, err, error);

@@ -29,6 +29,7 @@ typedef struct yacad_task_impl_s {
      json_value_t *source;
      json_value_t *run;
      yacad_runnerid_t *runnerid;
+     char project_name[0];
 } yacad_task_impl_t;
 
 static unsigned long get_id(yacad_task_impl_t *this) {
@@ -61,6 +62,10 @@ static json_value_t *get_source(yacad_task_impl_t *this) {
 
 static json_value_t *get_run(yacad_task_impl_t *this) {
      return this->run;
+}
+
+static const char *get_project_name(yacad_task_impl_t *this) {
+     return this->project_name;
 }
 
 static bool_t same_as(yacad_task_impl_t *this, yacad_task_impl_t *other) {
@@ -96,12 +101,13 @@ static yacad_task_t impl_fn = {
      .get_runnerid = (yacad_task_get_runnerid_fn)get_runnerid,
      .get_source = (yacad_task_get_source_fn)get_source,
      .get_run = (yacad_task_get_run_fn)get_run,
+     .get_project_name = (yacad_task_get_project_name_fn)get_project_name,
      .same_as = (yacad_task_same_as_fn)same_as,
      .free = (yacad_task_free_fn)free_,
 };
 
-yacad_task_t *yacad_task_restore(logger_t log, unsigned long id, time_t timestamp, yacad_task_status_t status, json_value_t *run, json_value_t *source, yacad_runnerid_t *runnerid) {
-     yacad_task_impl_t *result = malloc(sizeof(yacad_task_impl_t));
+yacad_task_t *yacad_task_restore(logger_t log, unsigned long id, time_t timestamp, yacad_task_status_t status, json_value_t *run, json_value_t *source, yacad_runnerid_t *runnerid, const char *project_name) {
+     yacad_task_impl_t *result = malloc(sizeof(yacad_task_impl_t) + strlen(project_name) + 1);
 
      result->fn = impl_fn;
      result->log = log;
@@ -112,12 +118,13 @@ yacad_task_t *yacad_task_restore(logger_t log, unsigned long id, time_t timestam
      result->run = run;
      result->source = source;
      result->runnerid = runnerid;
+     strcpy(result->project_name, project_name);
 
      return I(result);
 }
 
-yacad_task_t *yacad_task_new(logger_t log, json_value_t *task, cad_hash_t *env) {
-     yacad_task_impl_t *result = malloc(sizeof(yacad_task_impl_t));
+yacad_task_t *yacad_task_new(logger_t log, json_value_t *task, cad_hash_t *env, const char *project_name) {
+     yacad_task_impl_t *result = malloc(sizeof(yacad_task_impl_t) + strlen(project_name) + 1);
      yacad_json_template_t *template;
      yacad_json_finder_t *finder = yacad_json_finder_new(log, json_type_object, "%s");
 
@@ -139,6 +146,8 @@ yacad_task_t *yacad_task_new(logger_t log, json_value_t *task, cad_hash_t *env) 
 
      finder->visit(finder, result->task, "runner");
      result->runnerid = yacad_runnerid_new(log, finder->get_value(finder));
+
+     strcpy(result->project_name, project_name);
 
      I(finder)->free(I(finder));
 
