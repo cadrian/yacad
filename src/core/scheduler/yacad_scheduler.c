@@ -248,6 +248,7 @@ static void visit_query_set_result(yacad_scheduler_message_visitor_t *this, yaca
                if (next_task != NULL) {
                     this->scheduler->tasklist->add(this->scheduler->tasklist, next_task);
                }
+               // TODO reply to the sender
           }
      }
 }
