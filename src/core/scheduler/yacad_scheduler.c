@@ -33,6 +33,7 @@ typedef struct {
 typedef struct yacad_scheduler_impl_s {
      yacad_scheduler_t fn;
      yacad_conf_t *conf;
+     yacad_database_t *database;
      yacad_tasklist_t *tasklist;
      next_check_t worker_next_check;
      pthread_t worker;
@@ -58,6 +59,7 @@ static void stop(yacad_scheduler_impl_t *this) {
 
 static void free_(yacad_scheduler_impl_t *this) {
      this->tasklist->free(this->tasklist);
+     this->database->free(this->database);
      this->conf->free(this->conf);
      free(this);
 }
@@ -372,6 +374,7 @@ static yacad_scheduler_t impl_fn = {
 
 yacad_scheduler_t *yacad_scheduler_new(yacad_conf_t *conf) {
      yacad_scheduler_impl_t *result = malloc(sizeof(yacad_scheduler_impl_t));
+     yacad_database_t *database = yacad_database_new(conf->log, conf->get_database_name(conf));
      struct timeval now;
      gettimeofday(&now, NULL);
      result->fn = impl_fn;
@@ -379,7 +382,8 @@ yacad_scheduler_t *yacad_scheduler_new(yacad_conf_t *conf) {
      result->running = false;
      result->worker_next_check.confgen = -1;
      result->worker_next_check.time = now;
-     result->tasklist = yacad_tasklist_new(conf->log, conf->get_database_name(conf));
+     result->database = database;
+     result->tasklist = yacad_tasklist_new(conf->log, database);
      pthread_create(&(result->worker), NULL, (void*(*)(void*))worker_routine, result);
      return I(result);
 }

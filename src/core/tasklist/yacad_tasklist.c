@@ -14,9 +14,9 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <sqlite3.h>
-
 #include "yacad_tasklist.h"
+
+#define STMT_DROP_TABLE "drop table if exists TASKLIST"
 
 #define STMT_CREATE_TABLE "create table TASKLIST ("       \
      "ID integer primary key asc autoincrement, "         \
@@ -25,43 +25,21 @@
      ")"
 
 #define STMT_SELECT "select ID, STATUS, SERIAL from TASKLIST where STATUS=? order by ID asc"
-#define STMT_INSERT "insert into TASKLIST (STATUS, SERIAL) values (?,?)"
+#define STMT_INSERT "insert into TASKLIST (STATUS,SERIAL) values (?,?)"
 #define STMT_UPDATE "update TASKLIST set STATUS=? where ID=?"
 
 typedef struct yacad_tasklist_impl_s {
      yacad_tasklist_t fn;
      logger_t log;
      cad_array_t *tasklist;
-     sqlite3 *db;
+     yacad_database_t *db;
 } yacad_tasklist_impl_t;
-
-static bool_t __sqlcheck(sqlite3 *db, logger_t log, int sqlerr, level_t level, const char *sqlaction, unsigned int line) {
-     int result = true;
-     const char *msg;
-     char *paren;
-     int len;
-     if (sqlerr != SQLITE_OK) {
-          log(debug, "Error line %u: %s", line, sqlaction);
-          paren = strchrnul(sqlaction, '(');
-          len = paren - sqlaction;
-          msg = db == NULL ? NULL : sqlite3_errmsg(db);
-          if (msg == NULL) {
-               log(level, "%.*s: error %d", len, sqlaction, sqlerr);
-          } else {
-               log(level, "%.*s: error %d: %s", len, sqlaction, sqlerr, msg);
-          }
-          result = false;
-     }
-     return result;
-}
-
-#define sqlcheck(db, log, sqlaction, level) __sqlcheck(db, log, (sqlaction), (level), #sqlaction, __LINE__)
 
 static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
      int i, n;
      bool_t found = false;
      yacad_task_t *other;
-     sqlite3_stmt *query = NULL;
+     yacad_statement_t *query = NULL;
      yacad_task_status_t status = task->get_status(task);
      char *serial;
 
@@ -74,19 +52,22 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
           task->free(task);
      } else {
           serial = task->serialize(task);
+          query = this->db->update(this->db, STMT_INSERT);
+          if (query == NULL) {
+               this->log(warn, "LOST task: %s", serial);
+          } else {
+               query->bind_int(query, 0, status);
+               query->bind_string(query, 1, serial);
+               query->run(query, NULL, NULL);
+               task->set_id(task, query->get_rowid(query));
+               query->free(query);
 
-          if (sqlcheck(this->db, this->log, sqlite3_prepare_v2(this->db, STMT_INSERT, -1, &query, NULL), error)) {
-               sqlcheck(this->db, this->log, sqlite3_bind_int(query, 1, (int)status), warn);
-               sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 2, serial, strlen(serial), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
-               sqlite3_step(query);
-               task->set_id(task, (unsigned long)sqlite3_last_insert_rowid(this->db));
-               sqlcheck(this->db, this->log, sqlite3_finalize(query), warn);
                free(serial);
                serial = task->serialize(task); // to get the right id
-          }
 
-          this->log(info, "Added task: %s", serial);
-          this->tasklist->insert(this->tasklist, n, &task);
+               this->log(info, "Added task: %s", serial);
+               this->tasklist->insert(this->tasklist, n, &task);
+          }
 
           free(serial);
      }
@@ -116,15 +97,16 @@ static yacad_task_t *get(yacad_tasklist_impl_t *this, yacad_runnerid_t *runnerid
 }
 
 static void update_task_status(yacad_tasklist_impl_t *this, yacad_task_t *task, yacad_task_status_t status) {
-     sqlite3_stmt *query = NULL;
+     yacad_statement_t *query = NULL;
      char *serial;
      unsigned long id = task->get_id(task);
 
-     if (sqlcheck(this->db, this->log, sqlite3_prepare_v2(this->db, STMT_UPDATE, -1, &query, NULL), error)) {
-          sqlcheck(this->db, this->log, sqlite3_bind_int(query, 1, (int)status), warn);
-          sqlcheck(this->db, this->log, sqlite3_bind_int64(query, 1, (sqlite3_int64)id), warn);
-          sqlite3_step(query);
-          sqlcheck(this->db, this->log, sqlite3_finalize(query), warn);
+     query = this->db->update(this->db, STMT_UPDATE);
+     if (query != NULL) {
+          query->bind_int(query, 0, status);
+          query->bind_int(query, 1, id);
+          query->run(query, NULL, NULL);
+          query->free(query);
 
           serial = task->serialize(task);
           this->log(info, "Updated task: %s", serial);
@@ -148,9 +130,6 @@ static void free_(yacad_tasklist_impl_t *this) {
           task->free(task);
      }
      this->tasklist->free(this->tasklist);
-     if (this->db != NULL) {
-          sqlite3_close(this->db);
-     }
      free(this);
 }
 
@@ -162,7 +141,10 @@ static yacad_tasklist_t impl_fn = {
      .free = (yacad_tasklist_free_fn)free_,
 };
 
-static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, int sql_status, const unsigned char *sql_serial) {
+static void add_task(yacad_statement_t *stmt, yacad_tasklist_impl_t *this) {
+     long sql_id = stmt->get_int(stmt, 0);
+     long sql_status = stmt->get_int(stmt, 1);
+     const char *sql_serial = stmt->get_string(stmt, 2);
      yacad_task_t *task = yacad_task_unserialize(this->log, (char*)sql_serial);
      char *serial;
      task->set_id(task, (unsigned long)sql_id);
@@ -173,68 +155,37 @@ static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, int sql_
      free(serial);
 }
 
-yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
+yacad_tasklist_t *yacad_tasklist_new(logger_t log, yacad_database_t *database) {
      yacad_tasklist_impl_t *result;
-     static bool_t init = false;
-     sqlite3 *db = NULL;
-     sqlite3_stmt *query = NULL;
-     bool_t done = false;
-     int err;
-
-     if (!init) {
-          if (!sqlcheck(NULL, log, sqlite3_initialize(), debug)) {
-               log(error, "Could not initialize database: %s", database_name);
-               return NULL;
-          }
-          init = true;
-     }
-
-     if (!sqlcheck(NULL, log, sqlite3_open_v2(database_name, &db, SQLITE_OPEN_READWRITE, NULL), debug)) {
-          log(debug, "Creating database: %s", database_name);
-          if (!sqlcheck(NULL, log, sqlite3_open_v2(database_name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL), debug)) {
-               log(error, "Could not create database: %s", database_name);
-               return NULL;
-          }
-          log(debug, "Creating table");
-          if (!sqlcheck(db, log, sqlite3_exec(db, STMT_CREATE_TABLE, NULL, NULL, NULL), debug)) {
-               log(error, "Could not create table");
-               sqlite3_close(db);
-               return NULL;
-          }
-     }
+     yacad_statement_t *stmt;
 
      result = malloc(sizeof(yacad_tasklist_impl_t));
      result->fn = impl_fn;
      result->log = log;
      result->tasklist = cad_new_array(stdlib_memory, sizeof(yacad_task_t*));
-     result->db = db;
+     result->db = database;
 
-     if (sqlcheck(db, log, sqlite3_prepare_v2(db, STMT_SELECT, -1, &query, NULL), error)) {
-          sqlcheck(db, log, sqlite3_bind_int(query, 1, (int)task_new), warn);
-          do {
-               err = sqlite3_step(query);
-               switch(err) {
-               case SQLITE_DONE:
-                    done = true;
-                    break;
-               case SQLITE_BUSY:
-                    log(info, "Database is busy, waiting one second");
-                    sleep(1);
-                    break;
-               case SQLITE_OK: // ??
-               case SQLITE_ROW:
-                    add_task(result,
-                             sqlite3_column_int64(query, 0),
-                             sqlite3_column_int(query, 1),
-                             sqlite3_column_text(query, 2));
-                    break;
-               default:
-                    sqlcheck(db, log, err, error);
-                    done = true;
-               }
-          } while (!done);
+     if (database->need_install(database)) {
+          stmt = database->update(database, STMT_DROP_TABLE);
+          if (stmt != NULL) {
+               stmt->run(stmt, NULL, NULL);
+               stmt->free(stmt);
+          }
+          stmt = database->update(database, STMT_CREATE_TABLE);
+          if (stmt != NULL) {
+               stmt->run(stmt, NULL, NULL);
+               stmt->free(stmt);
+          }
+          database->set_installed(database);
+     }
 
-          sqlcheck(db, log, sqlite3_finalize(query), warn);
+     stmt = database->select(database, STMT_SELECT);
+     if (stmt == NULL) {
+          log(warn, "Could not restore tasks");
+     } else {
+          stmt->bind_int(stmt, 0, task_new);
+          stmt->run(stmt, (yacad_select_fn)add_task, result);
+          stmt->free(stmt);
      }
 
      return I(result);

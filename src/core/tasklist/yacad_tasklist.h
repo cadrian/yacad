@@ -18,6 +18,7 @@
 #define __YACAD_TASKLIST_H__
 
 #include "yacad.h"
+#include "common/database/yacad_database.h"
 #include "common/runnerid/yacad_runnerid.h"
 #include "common/task/yacad_task.h"
 
@@ -37,6 +38,6 @@ struct yacad_tasklist_s {
      yacad_tasklist_free_fn free;
 };
 
-yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *root_path);
+yacad_tasklist_t *yacad_tasklist_new(logger_t log, yacad_database_t *database);
 
 #endif /* __YACAD_TASKLIST_H__ */
