@@ -98,7 +98,7 @@ yacad_message_reply_get_task_t *yacad_message_reply_get_task_unserialize(logger_
      task_run = v->get_value(v);
      v->visit(v, result->serial, "task/source");
      task_source = v->get_value(v);
-     result->task = yacad_task_restore(log, 0UL, (time_t)0, task_new, task_run, task_source, result->runnerid, NULL); // TODO replace all that with getting the right task from the tasklist (we must know the task id)
+     result->task = yacad_task_restore(log, 0UL, (time_t)0, task_new, task_run, task_source, result->runnerid, NULL, 0); // TODO replace all that with getting the right task from the tasklist (we must know the task id)
 
      I(t)->free(I(t));
      I(v)->free(I(v));

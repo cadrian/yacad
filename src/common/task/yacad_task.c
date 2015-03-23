@@ -25,10 +25,12 @@ typedef struct yacad_task_impl_s {
      unsigned long id;
      time_t timestamp;
      yacad_task_status_t status;
+     int taskindex;
      json_value_t *task;
      json_value_t *source;
      json_value_t *run;
      yacad_runnerid_t *runnerid;
+     cad_hash_t *env;
      char project_name[0];
 } yacad_task_impl_t;
 
@@ -68,6 +70,18 @@ static const char *get_project_name(yacad_task_impl_t *this) {
      return this->project_name;
 }
 
+static int get_taskindex(yacad_task_impl_t *this) {
+     return this->taskindex;
+}
+
+static void set_taskindex(yacad_task_impl_t *this, int index) {
+     this->taskindex = index;
+}
+
+static cad_hash_t *get_env(yacad_task_impl_t *this) {
+     return this->env;
+}
+
 static bool_t same_as(yacad_task_impl_t *this, yacad_task_impl_t *other) {
      bool_t result = false;
      static yacad_json_compare_t *cmp = NULL;
@@ -88,7 +102,13 @@ static bool_t same_as(yacad_task_impl_t *this, yacad_task_impl_t *other) {
      return result;
 }
 
+static void env_cleaner(cad_hash_t *env, int index, const char *key, char *value, yacad_task_impl_t *this) {
+     free(value);
+}
+
 static void free_(yacad_task_impl_t *this) {
+     this->env->clean(this->env, (cad_hash_iterator_fn)env_cleaner, this);
+     this->env->free(this->env);
      free(this);
 }
 
@@ -102,11 +122,14 @@ static yacad_task_t impl_fn = {
      .get_source = (yacad_task_get_source_fn)get_source,
      .get_run = (yacad_task_get_run_fn)get_run,
      .get_project_name = (yacad_task_get_project_name_fn)get_project_name,
+     .get_taskindex = (yacad_task_get_taskindex_fn)get_taskindex,
+     .set_taskindex = (yacad_task_set_taskindex_fn)set_taskindex,
+     .get_env = (yacad_task_get_env_fn)get_env,
      .same_as = (yacad_task_same_as_fn)same_as,
      .free = (yacad_task_free_fn)free_,
 };
 
-yacad_task_t *yacad_task_restore(logger_t log, unsigned long id, time_t timestamp, yacad_task_status_t status, json_value_t *run, json_value_t *source, yacad_runnerid_t *runnerid, const char *project_name) {
+yacad_task_t *yacad_task_restore(logger_t log, unsigned long id, time_t timestamp, yacad_task_status_t status, json_value_t *run, json_value_t *source, yacad_runnerid_t *runnerid, const char *project_name, int taskindex) {
      yacad_task_impl_t *result = malloc(sizeof(yacad_task_impl_t) + strlen(project_name) + 1);
 
      result->fn = impl_fn;
@@ -119,11 +142,16 @@ yacad_task_t *yacad_task_restore(logger_t log, unsigned long id, time_t timestam
      result->source = source;
      result->runnerid = runnerid;
      strcpy(result->project_name, project_name);
+     result->taskindex = taskindex;
 
      return I(result);
 }
 
-yacad_task_t *yacad_task_new(logger_t log, json_value_t *task, cad_hash_t *env, const char *project_name) {
+static void fill_env(cad_hash_t *env, int index, const char *key, const char *value, yacad_task_impl_t *this) {
+     this->env->set(this->env, key, strdup(value));
+}
+
+yacad_task_t *yacad_task_new(logger_t log, json_value_t *task, cad_hash_t *env, const char *project_name, int taskindex) {
      yacad_task_impl_t *result = malloc(sizeof(yacad_task_impl_t) + strlen(project_name) + 1);
      yacad_json_template_t *template;
      yacad_json_finder_t *finder = yacad_json_finder_new(log, json_type_object, "%s");
@@ -134,7 +162,12 @@ yacad_task_t *yacad_task_new(logger_t log, json_value_t *task, cad_hash_t *env, 
      result->id = 0;
      result->status = task_new;
 
-     template = yacad_json_template_new(log, env);
+     result->env = cad_new_hash(stdlib_memory, cad_hash_strings);
+     if (env != NULL) {
+          env->iterate(env, (cad_hash_iterator_fn)fill_env, result);
+     }
+
+     template = yacad_json_template_new(log, result->env);
      result->task = template->resolve(template, task);
      I(template)->free(I(template));
 
@@ -148,6 +181,8 @@ yacad_task_t *yacad_task_new(logger_t log, json_value_t *task, cad_hash_t *env, 
      result->runnerid = yacad_runnerid_new(log, finder->get_value(finder));
 
      strcpy(result->project_name, project_name);
+
+     result->taskindex = taskindex;
 
      I(finder)->free(I(finder));
 

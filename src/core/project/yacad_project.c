@@ -21,7 +21,6 @@ typedef struct yacad_project_impl_s {
      logger_t log;
      yacad_cron_t *cron;
      json_array_t *tasks;
-     int taskindex;
      yacad_scm_t *scm;
      char *name;
      char *root_path;
@@ -48,19 +47,21 @@ static yacad_task_t *check(yacad_project_impl_t *this) {
      cad_hash_t *env = cad_new_hash(stdlib_memory, cad_hash_strings);
      if (this->scm->check(this->scm)) {
           this->scm->fill_env(this->scm, env);
-          result = yacad_task_new(this->log, this->tasks->get(this->tasks, this->taskindex), env, this->name);
+          result = yacad_task_new(this->log, this->tasks->get(this->tasks, 0), env, this->name, 0);
      }
      env->clean(env, (cad_hash_iterator_fn)env_cleaner, this);
      env->free(env);
      return result;
 }
 
-static void next_task(yacad_project_impl_t *this) {
-     this->taskindex++;
-}
-
-static bool_t is_done(yacad_project_impl_t *this) {
-     return this->taskindex >= this->tasks->count(this->tasks);
+static yacad_task_t *next_task(yacad_project_impl_t *this, yacad_task_t *previous) {
+     yacad_task_t *result = NULL;
+     int taskindex = previous->get_taskindex(previous) + 1;
+     cad_hash_t *env = previous->get_env(previous);
+     if (taskindex < this->tasks->count(this->tasks)) {
+          result = yacad_task_new(this->log, this->tasks->get(this->tasks, taskindex), env, this->name, taskindex);
+     }
+     return result;
 }
 
 static void free_(yacad_project_impl_t *this) {
@@ -73,7 +74,6 @@ static yacad_project_t impl_fn = {
      .next_check = (yacad_project_next_check_fn) next_check,
      .check = (yacad_project_check_fn) check,
      .next_task = (yacad_project_next_task_fn)next_task,
-     .is_done = (yacad_project_is_done_fn)is_done,
      .free = (yacad_project_free_fn) free_,
 };
 
@@ -89,7 +89,6 @@ yacad_project_t *yacad_project_new(logger_t log, const char *name, const char *r
      strcpy(result->root_path, root_path);
      result->cron = cron;
      result->tasks = tasks;
-     result->taskindex = 0;
      result->scm = scm;
      return I(result);
 }

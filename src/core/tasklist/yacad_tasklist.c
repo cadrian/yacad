@@ -18,18 +18,19 @@
 
 #include "yacad_tasklist.h"
 
-#define STMT_CREATE_TABLE "create table TASKLIST ("      \
-     "ID integer primary key asc autoincrement, "        \
-     "TIMESTAMP integer not null, "                      \
-     "STATUS integer not null, "                         \
-     "SOURCE not null,"                                  \
-     "RUN not null,"                                     \
-     "RUNNERID not null,"                                \
-     "PROJECT not null"                                  \
+#define STMT_CREATE_TABLE "create table TASKLIST ("       \
+     "ID integer primary key asc autoincrement, "         \
+     "TIMESTAMP integer not null, "                       \
+     "STATUS integer not null, "                          \
+     "SOURCE not null,"                                   \
+     "RUN not null,"                                      \
+     "RUNNERID not null,"                                 \
+     "PROJECT not null,"                                  \
+     "TASKINDEX not null"                                 \
      ")"
 
-#define STMT_SELECT "select ID, TIMESTAMP, STATUS, SOURCE, RUN, RUNNERID, PROJECT from TASKLIST where STATUS=? order by ID asc"
-#define STMT_INSERT "insert into TASKLIST (TIMESTAMP, STATUS, SOURCE, RUN, RUNNERID, PROJECT) values (?,?,?,?,?,?)"
+#define STMT_SELECT "select ID, TIMESTAMP, STATUS, SOURCE, RUN, RUNNERID, PROJECT, TASKINDEX from TASKLIST where STATUS=? order by ID asc"
+#define STMT_INSERT "insert into TASKLIST (TIMESTAMP, STATUS, SOURCE, RUN, RUNNERID, PROJECT, TASKINDEX) values (?,?,?,?,?,?,?)"
 #define STMT_UPDATE "update TASKLIST set STATUS=? where ID = ?"
 
 typedef struct yacad_tasklist_impl_s {
@@ -75,6 +76,7 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
      const char *prj;
      time_t timestamp = task->get_timestamp(task);
      yacad_task_status_t status = task->get_status(task);
+     int taskindex = task->get_taskindex(task);
      json_output_stream_t *out;
      json_visitor_t *writer;
 
@@ -109,12 +111,13 @@ static void add(yacad_tasklist_impl_t *this, yacad_task_t *task) {
                sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 4, run, strlen(run), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
                sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 5, rid, strlen(rid), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
                sqlcheck(this->db, this->log, sqlite3_bind_text64(query, 6, prj, strlen(prj), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
+               sqlcheck(this->db, this->log, sqlite3_bind_int(query, 7, taskindex), warn);
                sqlite3_step(query);
                task->set_id(task, (unsigned long)sqlite3_last_insert_rowid(this->db));
                sqlcheck(this->db, this->log, sqlite3_finalize(query), warn);
           }
 
-          this->log(info, "Added task: {\"id\":%lu,\"runnerid\":%s,\"source\":%s,\"run\":%s,\"project\":\"%s\"}", task->get_id(task), rid, src, run, prj);
+          this->log(info, "Added task: {\"id\":%lu,\"runnerid\":%s,\"source\":%s,\"run\":%s,\"project\":\"%s\",\"taskindex\":%d}", task->get_id(task), rid, src, run, prj, taskindex);
           this->tasklist->insert(this->tasklist, n, &task);
 
           free(src);
@@ -167,7 +170,7 @@ static yacad_tasklist_t impl_fn = {
 
 static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, sqlite3_int64 sql_timestamp, int sql_status,
                      const unsigned char *sql_source, const unsigned char *sql_run, const unsigned char *sql_runnerid,
-                     const unsigned char *sql_project) {
+                     const unsigned char *sql_project, int sql_taskindex) {
      yacad_task_t *task;
      json_value_t *jrun;
      json_value_t *jsource;
@@ -184,10 +187,10 @@ static void add_task(yacad_tasklist_impl_t *this, sqlite3_int64 sql_id, sqlite3_
 
      runnerid = yacad_runnerid_unserialize(this->log, (char*)sql_runnerid);
 
-     task = yacad_task_restore(this->log, (unsigned long)sql_id, (time_t)sql_timestamp, (yacad_task_status_t)sql_status, jrun, jsource, runnerid, (char*)sql_project);
+     task = yacad_task_restore(this->log, (unsigned long)sql_id, (time_t)sql_timestamp, (yacad_task_status_t)sql_status, jrun, jsource, runnerid, (char*)sql_project, sql_taskindex);
 
      this->tasklist->insert(this->tasklist, this->tasklist->count(this->tasklist), &task);
-     this->log(info, "Restored task: {\"id\":%lu,\"runnerid\":%s,\"source\":%s,\"run\":%s,\"project\":\"%s\"}", (unsigned long)sql_id, sql_runnerid, sql_source, sql_run, sql_project);
+     this->log(info, "Restored task: {\"id\":%lu,\"runnerid\":%s,\"source\":%s,\"run\":%s,\"project\":\"%s\",\"taskindex\":%d}", (unsigned long)sql_id, sql_runnerid, sql_source, sql_run, sql_project, sql_taskindex);
 }
 
 yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
@@ -245,7 +248,8 @@ yacad_tasklist_t *yacad_tasklist_new(logger_t log, const char *database_name) {
                              sqlite3_column_text(query, 3),
                              sqlite3_column_text(query, 4),
                              sqlite3_column_text(query, 5),
-                             sqlite3_column_text(query, 6));
+                             sqlite3_column_text(query, 6),
+                             sqlite3_column_int(query, 7));
                     break;
                default:
                     sqlcheck(db, log, err, error);
