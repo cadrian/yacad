@@ -20,7 +20,8 @@
 #include "common/json/yacad_json_finder.h"
 
 #define DATABASE_NAME "yacad-core.db"
-#define DEFAULT_PORT 1789
+#define DEFAULT_ENDPOINT_PORT 1789
+#define DEFAULT_EVENTS_PORT 1791
 #define DEFAULT_ROOT_PATH "."
 
 static const char *dirs[] = {
@@ -41,6 +42,7 @@ typedef struct yacad_conf_impl_s {
      char *root_path;
      char *database_name;
      char *endpoint_name;
+     char *events_name;
 } yacad_conf_impl_t;
 
 static const char *get_database_name(yacad_conf_impl_t *this) {
@@ -49,6 +51,10 @@ static const char *get_database_name(yacad_conf_impl_t *this) {
 
 static const char *get_endpoint_name(yacad_conf_impl_t *this) {
      return this->endpoint_name;
+}
+
+static const char *get_events_name(yacad_conf_impl_t *this) {
+     return this->events_name;
 }
 
 static cad_hash_t *get_projects(yacad_conf_impl_t *this) {
@@ -67,6 +73,7 @@ static void free_(yacad_conf_impl_t *this) {
      if (this->json != NULL) {
           this->json->accept(this->json, json_kill());
      }
+     free(this->events_name);
      free(this->endpoint_name);
      free(this->database_name);
      free(this->root_path);
@@ -78,6 +85,7 @@ static yacad_conf_t impl_fn =  {
      .log = NULL,
      .get_database_name = (yacad_conf_get_database_name_fn)get_database_name,
      .get_endpoint_name = (yacad_conf_get_endpoint_name_fn)get_endpoint_name,
+     .get_events_name = (yacad_conf_get_events_name_fn)get_events_name,
      .get_projects = (yacad_conf_get_projects_fn)get_projects,
      .get_runners = (yacad_conf_get_runners_fn)get_runners,
      .generation = (yacad_conf_generation_fn)generation,
@@ -168,9 +176,21 @@ static void set_root_path(yacad_conf_impl_t *this) {
           this->endpoint_name = realloc(this->endpoint_name, n);
           jstring->utf8(jstring, this->endpoint_name, n);
      } else {
-          n = snprintf("", 0, "tcp://*:%d", DEFAULT_PORT) + 1;
+          n = snprintf("", 0, "tcp://*:%d", DEFAULT_ENDPOINT_PORT) + 1;
           this->endpoint_name = realloc(this->endpoint_name, n);
-          snprintf(this->endpoint_name, n, "tcp://*:%d", DEFAULT_PORT);
+          snprintf(this->endpoint_name, n, "tcp://*:%d", DEFAULT_ENDPOINT_PORT);
+     }
+
+     v->visit(v, this->json, "events");
+     jstring = v->get_string(v);
+     if (jstring != NULL) {
+          n = jstring->count(jstring) + 1;
+          this->events_name = realloc(this->events_name, n);
+          jstring->utf8(jstring, this->events_name, n);
+     } else {
+          n = snprintf("", 0, "tcp://*:%d", DEFAULT_EVENTS_PORT) + 1;
+          this->events_name = realloc(this->events_name, n);
+          snprintf(this->events_name, n, "tcp://*:%d", DEFAULT_EVENTS_PORT);
      }
 
      I(v)->free(I(v));
@@ -303,7 +323,7 @@ yacad_conf_t *yacad_conf_new(void) {
 
      result->projects = cad_new_hash(stdlib_memory, cad_hash_strings);
      result->runners = cad_new_hash(stdlib_memory, cad_hash_strings);
-     result->filename = result->root_path = result->database_name = result->endpoint_name = NULL;
+     result->filename = result->root_path = result->database_name = result->endpoint_name = result->events_name = NULL;
      result->json = NULL;
      result->generation = 0;
 
@@ -317,6 +337,7 @@ yacad_conf_t *yacad_conf_new(void) {
                set_root_path(result);
                I(result)->log(info, "Projects root path is %s", result->root_path);
                I(result)->log(info, "Core 0MQ endpoint is %s", result->endpoint_name);
+               I(result)->log(info, "Core 0MQ events is %s", result->events_name);
                read_projects(result);
           }
           ref = result;

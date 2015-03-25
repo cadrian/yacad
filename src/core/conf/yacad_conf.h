@@ -23,6 +23,7 @@ typedef struct yacad_conf_s yacad_conf_t;
 
 typedef const char *(*yacad_conf_get_database_name_fn)(yacad_conf_t *this);
 typedef const char *(*yacad_conf_get_endpoint_name_fn)(yacad_conf_t *this);
+typedef const char *(*yacad_conf_get_events_name_fn)(yacad_conf_t *this);
 typedef cad_hash_t *(*yacad_conf_get_projects_fn)(yacad_conf_t *this);
 typedef cad_hash_t *(*yacad_conf_get_runners_fn)(yacad_conf_t *this);
 typedef int (*yacad_conf_generation_fn)(yacad_conf_t *this);
@@ -32,6 +33,7 @@ struct yacad_conf_s {
      logger_t log;
      yacad_conf_get_database_name_fn get_database_name;
      yacad_conf_get_endpoint_name_fn get_endpoint_name;
+     yacad_conf_get_events_name_fn get_events_name;
      yacad_conf_get_projects_fn get_projects;
      yacad_conf_get_runners_fn get_runners;
      yacad_conf_generation_fn generation;

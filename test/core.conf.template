@@ -4,7 +4,8 @@
     },
     "core": {
         "root_path": "#PATH#/test/projects", // for tests
-        "endpoint": "tcp://*:1789", // that is actually the default
+        "endpoint": "tcp://*:1989", // the default is 1789
+        "events": "tcp://*:1991", // the default is 1791
     },
     "projects": [
         {

@@ -24,6 +24,7 @@
 #define MSG_START "start"
 #define MSG_CHECK "check"
 #define MSG_STOP  "stop"
+#define MSG_EVENT "event"
 
 typedef struct {
      struct timeval time; // time of the next check
@@ -38,6 +39,7 @@ typedef struct yacad_scheduler_impl_s {
      next_check_t worker_next_check;
      pthread_t worker;
      bool_t running;
+     bool_t publish;
 } yacad_scheduler_impl_t;
 
 static bool_t is_done(yacad_scheduler_impl_t *this) {
@@ -162,6 +164,7 @@ static void iterate_check_project(cad_hash_t *projects, int index, const char *p
      yacad_task_t *task = project->check(project);
      if (task != NULL) {
           this->tasklist->add(this->tasklist, task);
+          this->publish = true;
      }
 }
 
@@ -253,6 +256,7 @@ static void visit_query_set_result(yacad_scheduler_message_visitor_t *this, yaca
                next_task = project->next_task(project, task);
                if (next_task != NULL) {
                     this->scheduler->tasklist->add(this->scheduler->tasklist, next_task);
+                    this->scheduler->publish = true;
                }
                reply_set_result(this->scheduler, runnerid, this->zrunner);
           }
@@ -275,6 +279,7 @@ static void run(yacad_scheduler_impl_t *this) {
      void *zworker_check = zmq_socket(zcontext, ZMQ_PAIR);
      void *zworker_run = zmq_socket(zcontext, ZMQ_PAIR);
      void *zrunner = zmq_socket(zcontext, ZMQ_REP);
+     void *zevents = zmq_socket(zcontext, ZMQ_PUB);
      int n, c = 0;
      zmq_msg_t msg;
      char *strmsg = NULL;
@@ -289,7 +294,8 @@ static void run(yacad_scheduler_impl_t *this) {
 
      if (zworker_check != NULL && zworker_run != NULL && zrunner != NULL) {
           if (zmqcheck(this->conf->log, zmq_bind(zworker_check, INPROC_CHECK_ADDRESS), error)
-              && zmqcheck(this->conf->log, zmq_bind(zrunner, this->conf->get_endpoint_name(this->conf)), error)) {
+              && zmqcheck(this->conf->log, zmq_bind(zrunner, this->conf->get_endpoint_name(this->conf)), error)
+              && zmqcheck(this->conf->log, zmq_bind(zevents, this->conf->get_events_name(this->conf)), error)) {
 
                if (zmqcheck(this->conf->log, zmq_connect(zworker_run, INPROC_RUN_ADDRESS), error)) {
                     if (zmqcheck(this->conf->log, zmq_send(zworker_run, MSG_START, strlen(MSG_START), 0), error)) {
@@ -299,6 +305,7 @@ static void run(yacad_scheduler_impl_t *this) {
                }
 
                while (this->running) {
+                    this->publish = false;
                     if (!zmqcheck(this->conf->log, zmq_poll(zitems, 2, -1), debug)) {
                          this->running = false;
                     } else if (zitems[0].revents & ZMQ_POLLIN) {
@@ -362,12 +369,18 @@ static void run(yacad_scheduler_impl_t *this) {
                               }
                          }
                     }
+
+                    if (this->publish) {
+                         this->conf->log(debug, "Publishing event to %s", this->conf->get_events_name(this->conf));
+                         zmqcheck(this->conf->log, zmq_send(zevents, MSG_EVENT, strlen(MSG_EVENT), 0), warn);
+                    }
                }
           }
 
           zmqcheck(this->conf->log, zmq_close(zworker_run), warn);
           zmqcheck(this->conf->log, zmq_close(zworker_check), warn);
           zmqcheck(this->conf->log, zmq_close(zrunner), warn);
+          zmqcheck(this->conf->log, zmq_close(zevents), warn);
           free(strmsg);
      }
 }
