@@ -1,0 +1,14 @@
+{
+    "logging": {
+        "level": "debug",
+    },
+    "core": {
+        "endpoint": "tcp://*:1989", // the default is 1789
+        "events": "tcp://*:1991", // the default is 1791
+    },
+    "runner": {
+        "name": "runner1",
+        "arch": "foo",
+    },
+    "work_path": "#PATH#/test/runners/runner1"
+}

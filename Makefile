@@ -3,6 +3,7 @@
 PROJECT=yacad
 COMMON_OBJ=$(shell { find src/common -name '*.c'; ls src/*.c; } | sed -r 's|^src/|target/out/|g;s|\.c|.o|g')
 CORE_OBJ=$(shell find src/core -name '*.c' | sed -r 's|^src/|target/out/|g;s|\.c|.o|g')
+RUNNER_OBJ=$(shell find src/runner -name '*.c' | sed -r 's|^src/|target/out/|g;s|\.c|.o|g')
 
 ifeq "$(wildcard ../libcad)" ""
 LIBCAD=
@@ -48,11 +49,15 @@ clean: $(LIBCADCLEAN) $(LIBYACJPCLEAN)
 	rm -rf target debian
 	rm -f src/_exp_entry_registry.c
 
-exe: target/$(PROJECT)_core
+exe: target/$(PROJECT)_core target/$(PROJECT)_runner
 
 target/$(PROJECT)_core: $(COMMON_OBJ) $(CORE_OBJ) $(LIBCAD) $(LIBYACJP)
 	@echo "Compiling executable: $@"
 	$(CC) $(CFLAGS) -o $@ $(COMMON_OBJ) $(CORE_OBJ) -Wall -Werror -L target -lcad -lyacjp -lm -lgit2 -lsqlite3 -lzmq -lpthread
+
+target/$(PROJECT)_runner: $(COMMON_OBJ) $(RUNNER_OBJ) $(LIBCAD) $(LIBYACJP)
+	@echo "Compiling executable: $@"
+	$(CC) $(CFLAGS) -o $@ $(COMMON_OBJ) $(RUNNER_OBJ) -Wall -Werror -L target -lcad -lyacjp -lm -lgit2 -lsqlite3 -lzmq -lpthread
 
 target/out/%.o: src/%.c src/*.h Makefile
 	mkdir -p $(shell dirname $@)
@@ -107,6 +112,7 @@ install: exe doc target/version
 	mkdir -p debian/tmp/usr/share/$(PROJECT)
 	mkdir -p debian/tmp/usr/share/doc/$(PROJECT)-doc
 	-cp target/$(PROJECT)_core debian/tmp/usr/bin/
+	-cp target/$(PROJECT)_runner debian/tmp/usr/bin/
 	-cp -a target/*.pdf target/doc/html debian/tmp/usr/share/doc/$(PROJECT)-doc/
 
 release.main: target/dpkg/release.main release.doc
@@ -121,9 +127,9 @@ target/dpkg/release.main: exe target/version
 	mv ../$(PROJECT)_$(shell cat target/version)_*.build   target/dpkg/
 	mv ../$(PROJECT)_$(shell cat target/version)_*.changes target/dpkg/
 ifeq "$(wildcard /usr/bin/doxygen)" ""
-	(cd target && tar cfz $(PROJECT)_$(shell cat target/version)_$(shell gcc -v 2>&1 | grep '^Target:' | sed 's/^Target: //').tgz $(PROJECT)_core dpkg)
+	(cd target && tar cfz $(PROJECT)_$(shell cat target/version)_$(shell gcc -v 2>&1 | grep '^Target:' | sed 's/^Target: //').tgz $(PROJECT)_core $(PROJECT)_runner dpkg)
 else
-	(cd target && tar cfz $(PROJECT)_$(shell cat target/version)_$(shell gcc -v 2>&1 | grep '^Target:' | sed 's/^Target: //').tgz $(PROJECT)_core $(PROJECT).pdf $(PROJECT)-htmldoc.tgz dpkg)
+	(cd target && tar cfz $(PROJECT)_$(shell cat target/version)_$(shell gcc -v 2>&1 | grep '^Target:' | sed 's/^Target: //').tgz $(PROJECT)_core $(PROJECT)_runner $(PROJECT).pdf $(PROJECT)-htmldoc.tgz dpkg)
 endif
 	touch target/dpkg/release.main
 
