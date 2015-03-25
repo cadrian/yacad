@@ -165,35 +165,40 @@ static void iterate_check_project(cad_hash_t *projects, int index, const char *p
      }
 }
 
-static void send_task(yacad_scheduler_impl_t *this, yacad_task_t *task, void *zrunner) {
-     char *src, *run, *serial;
-     json_output_stream_t *out;
-     json_visitor_t *writer;
-     size_t n;
-     json_value_t *jsource = task->get_source(task);
-     json_value_t *jrun = task->get_run(task);
+static void reply_get_task(yacad_scheduler_impl_t *this, yacad_runnerid_t *runnerid, yacad_task_t *task, void *zrunner) {
+     yacad_message_reply_get_task_t *message;
+     yacad_scm_t *scm = NULL;
+     cad_hash_t *projects;
+     yacad_project_t *project;
+     char *serial = NULL;
 
-     out = new_json_output_stream_from_string(&src, stdlib_memory);
-     writer = json_write_to(out, stdlib_memory, 0);
-     jsource->accept(jsource, writer);
-     writer->free(writer);
-     out->free(out);
+     if (task != NULL) {
+          projects = this->conf->get_projects(this->conf);
+          project = projects->get(projects, task->get_project_name(task));
+          scm = project->get_scm(project);
+     }
+     message = yacad_message_reply_get_task_new(this->conf->log, runnerid, scm, task);
 
-     out = new_json_output_stream_from_string(&run, stdlib_memory);
-     writer = json_write_to(out, stdlib_memory, 0);
-     jrun->accept(jrun, writer);
-     writer->free(writer);
-     out->free(out);
+     serial = I(message)->serialize(I(message));
 
-     n = snprintf("", 0, "{\"id\":%lu,\"source\":%s,\"run\":%s}", task->get_id(task), src, run) + 1;
-     serial = malloc(n);
-     snprintf(serial, n, "{\"id\":%lu,\"source\":%s,\"run\":%s}", task->get_id(task), src, run);
-
-     zmqcheck(this->conf->log, zmq_send(zrunner, serial, n, 0), warn);
+     zmqcheck(this->conf->log, zmq_send(zrunner, serial, strlen(serial) + 1, 0), warn);
 
      free(serial);
-     free(src);
-     free(run);
+     I(message)->free(I(message));
+}
+
+static void reply_set_result(yacad_scheduler_impl_t *this, yacad_runnerid_t *runnerid, void *zrunner) {
+     yacad_message_reply_set_result_t *message;
+     char *serial = NULL;
+
+     message = yacad_message_reply_set_result_new(this->conf->log, runnerid);
+
+     serial = I(message)->serialize(I(message));
+
+     zmqcheck(this->conf->log, zmq_send(zrunner, serial, strlen(serial) + 1, 0), warn);
+
+     free(serial);
+     I(message)->free(I(message));
 }
 
 typedef struct {
@@ -212,10 +217,10 @@ static void visit_query_get_task(yacad_scheduler_message_visitor_t *this, yacad_
           task = this->scheduler->tasklist->get(this->scheduler->tasklist, runnerid);
           if (task == NULL) {
                this->scheduler->conf->log(info, "No suitable task for runnerid: %s", runnerid->serialize(runnerid));
-               zmqcheck(this->scheduler->conf->log, zmq_send(this->zrunner, "", 0, 0), warn);
+               reply_get_task(this->scheduler, runnerid, NULL, this->zrunner);
           } else {
                this->scheduler->conf->log(info, "Sending task %lu to runnerid: %s", task->get_id(task), runnerid->serialize(runnerid));
-               send_task(this->scheduler, task, this->zrunner);
+               reply_get_task(this->scheduler, runnerid, task, this->zrunner);
                task->set_status(task, task_running);
           }
      }
@@ -242,13 +247,14 @@ static void visit_query_set_result(yacad_scheduler_message_visitor_t *this, yaca
                this->scheduler->conf->log(warn, "Unknown project: %s", task->get_project_name(task));
           } else if (!message->is_successful(message)) {
                this->scheduler->tasklist->set_task_aborted(this->scheduler->tasklist, task);
+               reply_set_result(this->scheduler, runnerid, this->zrunner);
           } else {
                this->scheduler->tasklist->set_task_done(this->scheduler->tasklist, task);
                next_task = project->next_task(project, task);
                if (next_task != NULL) {
                     this->scheduler->tasklist->add(this->scheduler->tasklist, next_task);
                }
-               // TODO reply to the sender
+               reply_set_result(this->scheduler, runnerid, this->zrunner);
           }
      }
 }

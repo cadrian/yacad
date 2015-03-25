@@ -34,22 +34,33 @@ static void accept(yacad_message_reply_get_task_impl_t *this, yacad_message_visi
 static char *serialize(yacad_message_reply_get_task_impl_t *this) {
      char *result = NULL;
      const char *runnerid = this->runnerid->serialize(this->runnerid);
-     char *task = this->task->serialize(this->task);
-     json_value_t *scm_desc = this->scm->get_desc(this->scm);
+     char *task;
+     json_value_t *scm_desc;
      char *scm;
-     json_output_stream_t *scm_out = new_json_output_stream_from_string(&scm, stdlib_memory);
-     json_visitor_t *wscm = json_write_to(scm_out, stdlib_memory, 0);
+     json_output_stream_t *scm_out;
+     json_visitor_t *wscm;
      int n;
 
-     scm_desc->accept(scm_desc, wscm);
+     if (this->task == NULL) {
+          n = snprintf("", 0, "{\"type\":\"reply_get_task\",\"runner\":%s}", runnerid) + 1;
+          result = malloc(n);
+          snprintf(result, n, "{\"type\":\"reply_get_task\",\"runner\":%s}", runnerid);
+     } else {
+          task = this->task->serialize(this->task);
+          scm_desc = this->scm->get_desc(this->scm);
+          scm_out = new_json_output_stream_from_string(&scm, stdlib_memory);
+          wscm = json_write_to(scm_out, stdlib_memory, 0);
 
-     n = snprintf("", 0, "{\"type\":\"reply_get_task\",\"runner\":%s,\"task\":%s,\"scm\":%s}", runnerid, task, scm) + 1;
-     result = malloc(n);
-     snprintf(result, n, "{\"type\":\"reply_get_task\",\"runner\":%s,\"task\":%s,\"scm\":%s}", runnerid, task, scm);
+          scm_desc->accept(scm_desc, wscm);
 
-     wscm->free(wscm);
-     scm_out->free(scm_out);
-     free(task);
+          n = snprintf("", 0, "{\"type\":\"reply_get_task\",\"runner\":%s,\"task\":%s,\"scm\":%s}", runnerid, task, scm) + 1;
+          result = malloc(n);
+          snprintf(result, n, "{\"type\":\"reply_get_task\",\"runner\":%s,\"task\":%s,\"scm\":%s}", runnerid, task, scm);
+
+          wscm->free(wscm);
+          scm_out->free(scm_out);
+          free(task);
+     }
 
      return result;
 }

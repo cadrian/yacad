@@ -30,6 +30,7 @@ typedef const char *(*yacad_project_get_name_fn)(yacad_project_t *this);
 typedef struct timeval (*yacad_project_next_check_fn)(yacad_project_t *this);
 typedef yacad_task_t *(*yacad_project_check_fn)(yacad_project_t *this);
 typedef yacad_task_t *(*yacad_project_next_task_fn)(yacad_project_t *this, yacad_task_t *previous);
+typedef yacad_scm_t *(*yacad_project_get_scm_fn)(yacad_project_t *this);
 typedef void (*yacad_project_free_fn)(yacad_project_t *this);
 
 struct yacad_project_s {
@@ -37,6 +38,7 @@ struct yacad_project_s {
      yacad_project_next_check_fn next_check;
      yacad_project_check_fn check;
      yacad_project_next_task_fn next_task;
+     yacad_project_get_scm_fn get_scm;
      yacad_project_free_fn free;
 };
 

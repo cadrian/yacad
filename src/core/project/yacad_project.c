@@ -31,6 +31,10 @@ static const char *get_name(yacad_project_impl_t *this) {
      return this->name;
 }
 
+static yacad_scm_t *get_scm(yacad_project_impl_t *this) {
+     return this->scm;
+}
+
 static struct timeval next_check(yacad_project_impl_t *this) {
      struct timeval result = this->cron->next(this->cron);
      char tmbuf[20];
@@ -74,6 +78,7 @@ static yacad_project_t impl_fn = {
      .next_check = (yacad_project_next_check_fn) next_check,
      .check = (yacad_project_check_fn) check,
      .next_task = (yacad_project_next_task_fn)next_task,
+     .get_scm = (yacad_project_get_scm_fn)get_scm,
      .free = (yacad_project_free_fn) free_,
 };
 
