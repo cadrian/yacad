@@ -49,6 +49,7 @@ static bool_t is_done(yacad_scheduler_impl_t *this) {
 static void stop(yacad_scheduler_impl_t *this) {
      void *zcontext = get_zmq_context();
      void *zworker = zmq_socket(zcontext, ZMQ_PAIR);
+     this->running = false;
      if (zworker != NULL) {
           if (zmqcheck(this->conf->log, zmq_connect(zworker, INPROC_RUN_ADDRESS), error)) {
                zmqcheck(this->conf->log, zmq_send(zworker, MSG_STOP, strlen(MSG_STOP), 0), error);
@@ -56,7 +57,6 @@ static void stop(yacad_scheduler_impl_t *this) {
           }
           zmqcheck(this->conf->log, zmq_close(zworker), error);
      }
-     this->running = false;
 }
 
 static void free_(yacad_scheduler_impl_t *this) {
