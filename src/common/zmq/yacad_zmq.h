@@ -23,10 +23,13 @@ typedef struct yacad_zmq_poller_s yacad_zmq_poller_t;
 typedef struct yacad_zmq_socket_s yacad_zmq_socket_t;
 
 typedef void (*yacad_on_pollin_fn)(yacad_zmq_poller_t *poller, yacad_zmq_socket_t *socket, const char *message);
-typedef void (*yacad_on_pollout_fn)(yacad_zmq_poller_t *poller, yacad_zmq_socket_t *socket, char **message);
+typedef void (*yacad_on_pollout_fn)(yacad_zmq_poller_t *poller, yacad_zmq_socket_t *socket, char * const*message);
+typedef void (*yacad_on_timeout_fn)(yacad_zmq_poller_t *poller);
+typedef void (*yacad_timeout_fn)(yacad_zmq_poller_t *poller, struct timeval *timeout);
 
 typedef void (*yacad_zmq_poller_on_pollin_fn)(yacad_zmq_poller_t *this, yacad_zmq_socket_t *socket, yacad_on_pollin_fn on_pollin);
 typedef void (*yacad_zmq_poller_on_pollout_fn)(yacad_zmq_poller_t *this, yacad_zmq_socket_t *socket, yacad_on_pollout_fn on_pollout);
+typedef void (*yacad_zmq_poller_set_timeout_fn)(yacad_zmq_poller_t *this, yacad_timeout_fn timeout, yacad_on_timeout_fn on_timeout);
 typedef void (*yacad_zmq_poller_stop_fn)(yacad_zmq_poller_t *this);
 typedef void (*yacad_zmq_poller_run_fn)(yacad_zmq_poller_t *this);
 typedef void (*yacad_zmq_poller_free_fn)(yacad_zmq_poller_t *this);
@@ -34,6 +37,7 @@ typedef void (*yacad_zmq_poller_free_fn)(yacad_zmq_poller_t *this);
 struct yacad_zmq_poller_s {
      yacad_zmq_poller_on_pollin_fn on_pollin;
      yacad_zmq_poller_on_pollout_fn on_pollout;
+     yacad_zmq_poller_set_timeout_fn set_timeout;
      yacad_zmq_poller_stop_fn stop;
      yacad_zmq_poller_run_fn run;
      yacad_zmq_poller_free_fn free;

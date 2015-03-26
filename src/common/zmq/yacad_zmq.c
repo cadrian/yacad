@@ -28,8 +28,11 @@ typedef struct yacad_zmq_poller_impl_s {
      yacad_zmq_poller_t fn;
      logger_t log;
      cad_array_t *zitems; /* array of zmq_pollitem_t */
-     cad_hast_t *on_pollin;
+     cad_hash_t *sockets;
+     cad_hash_t *on_pollin;
      cad_hash_t *on_pollout;
+     yacad_timeout_fn timeout;
+     yacad_on_timeout_fn on_timeout;
      char *stopaddr;
      bool_t running;
      yacad_zmq_socket_t *stopsocket;
@@ -42,44 +45,41 @@ static void free_socket(yacad_zmq_socket_impl_t *this) {
 }
 
 static yacad_zmq_socket_t socket_fn = {
-     .free = (yacad_zmq_socket_free_fn)free_socket;
+     .free = (yacad_zmq_socket_free_fn)free_socket,
 };
 
 static yacad_zmq_socket_impl_t *yacad_zmq_socket_new(logger_t log, const char *addr, int type, int (*connect)(void *, const char *)) {
-     yacad_zmq_socket_impl_t *result;
+     yacad_zmq_socket_impl_t *result = NULL;
      void *context = get_zmq_context();
-     void *socket = zmq_socket(zcontext, type);
-     if (socket == NULL) {
-          return NULL;
+     void *socket = zmq_socket(context, type);
+     if (socket != NULL) {
+          if (!zmqcheck(log, connect(socket, addr), error)) {
+               zmqcheck(log, zmq_close(socket), warn);
+          } else {
+               result = malloc(sizeof(yacad_zmq_socket_impl_t) + strlen(addr) + 1);
+               result->fn = socket_fn;
+               result->log = log;
+               result->socket = socket;
+               result->type = type;
+               strcpy(result->addr, addr);
+          }
      }
-     if (!zmqcheck(log, connect(socket, addr), error)) {
-          zmqcheck(log, zmq_close(socket), warn);
-          return NULL;
-     }
-
-     result = malloc(sizeof(yacad_zmq_socket_impl_t) + strlen(addr) + 1);
-     result->fn = fn;
-     result->log = log;
-     result->socket = socket;
-     result->type = type;
-     strcpy(result->addr, addr);
-
-     return I(result);
+     return result;
 }
 
 yacad_zmq_socket_t *yacad_zmq_socket_bind(logger_t log, const char *addr, int type) {
-     yacad_zmq_socket_impl_t *result = yacad_zmq_socket_new(log, addr, zmq_bind);
+     yacad_zmq_socket_impl_t *result = yacad_zmq_socket_new(log, addr, type, zmq_bind);
      return result == NULL ? NULL : I(result);
 }
 
 yacad_zmq_socket_t *yacad_zmq_socket_connect(logger_t log, const char *addr, int type) {
-     yacad_zmq_socket_impl_t *result = yacad_zmq_socket_new(log, addr, zmq_connect);
+     yacad_zmq_socket_impl_t *result = yacad_zmq_socket_new(log, addr, type, zmq_connect);
      return result == NULL ? NULL : I(result);
 }
 
 static void register_action(yacad_zmq_poller_impl_t *this, yacad_zmq_socket_impl_t *socket, void *action, cad_hash_t *actions, short event) {
      int i, n = this->zitems->count(this->zitems);
-     zmq_pollitem_t *zitem = NULL, zitem_tmp;
+     zmq_pollitem_t *zitem = NULL, *zitem_tmp;
 
      for (i = 0; zitem == NULL && i < n; i++) {
           zitem_tmp = this->zitems->get(this->zitems, i);
@@ -91,10 +91,11 @@ static void register_action(yacad_zmq_poller_impl_t *this, yacad_zmq_socket_impl
           zitem = malloc(sizeof(zmq_pollitem_t));
           memset(zitem, 0, sizeof(zmq_pollitem_t));
           zitem->socket = socket->socket;
-          this->zitems->insert(this->array, n, zitem);
+          this->zitems->insert(this->zitems, n, zitem);
      }
      zitem->events |= event;
      actions->set(actions, socket->socket, action);
+     this->sockets->set(this->sockets, socket->socket, socket);
 }
 
 static void on_pollin(yacad_zmq_poller_impl_t *this, yacad_zmq_socket_impl_t *socket, yacad_on_pollin_fn on_pollin) {
@@ -105,15 +106,101 @@ static void on_pollout(yacad_zmq_poller_impl_t *this, yacad_zmq_socket_impl_t *s
      register_action(this, socket, on_pollout, this->on_pollout, ZMQ_POLLOUT);
 }
 
+static void set_timeout(yacad_zmq_poller_impl_t *this, yacad_timeout_fn timeout) {
+     this->timeout = timeout;
+}
+
 static void stop(yacad_zmq_poller_impl_t *this) {
-     yacad_zmq_socket_impl_t *stopsocket = yacad_zmq_socket_new(log, stopaddr, ZMQ_PAIR, zmq_connect);
+     yacad_zmq_socket_impl_t *stopsocket = yacad_zmq_socket_new(this->log, this->stopaddr, ZMQ_PAIR, zmq_connect);
      zmqcheck(this->log, zmq_send(stopsocket->socket, this->stopaddr, strlen(this->stopaddr), 0), error);
      free_socket(stopsocket);
 }
 
 static void run(yacad_zmq_poller_impl_t *this) {
+     zmq_pollitem_t *zitems = this->zitems->get(this->zitems, 0);
+     int i, zn = this->zitems->count(this->zitems);
+     struct timeval now, tmout;
+     long timeout;
+     yacad_on_pollin_fn on_pollin;
+     yacad_on_pollout_fn on_pollout;
+     bool_t found;
+     int n, c = 0;
+     char *strmsgin = NULL;
+     const char *strmsgout;
+     zmq_msg_t msg;
+     yacad_zmq_socket_t *socket;
+
      this->running = true;
      do {
+          if (this->timeout == NULL) {
+               timeout = -1;
+          } else {
+               gettimeofday(&now, NULL);
+               this->timeout(I(this), &tmout);
+               timeout = 1000L * (tmout.tv_sec - now.tv_sec);
+               if (timeout < 0) {
+                    timeout = 0;
+               }
+          }
+
+          if (!zmqcheck(this->log, zmq_poll(zitems, n, timeout), debug)) {
+               this->running = false;
+          } else {
+               found = false;
+               for (i = 0; i < zn; i++) {
+
+                    if (zitems[i].revents & ZMQ_POLLIN) {
+                         if (!zmqcheck(this->log, zmq_msg_init(&msg), error) ||
+                             !zmqcheck(this->log, n = zmq_msg_recv(&msg, zitems[i].socket, 0), error)) {
+                              this->running = false;
+                         } else {
+                              if (n > 0) {
+                                   if (c < n) {
+                                        if (c == 0) {
+                                             strmsgin = malloc(c = 4096);
+                                        } else {
+                                             do {
+                                                  c *= 2;
+                                             } while (c < n);
+                                             strmsgin = realloc(strmsgin, c);
+                                        }
+                                   }
+                                   memcpy(strmsgin, zmq_msg_data(&msg), n);
+                                   zmqcheck(this->log, zmq_msg_close(&msg), warn);
+                                   strmsgin[n] = '\0';
+                                   on_pollin = this->on_pollin->get(this->on_pollin, zitems[i].socket);
+                                   if (on_pollin == NULL) {
+                                        this->log(warn, "No pollin callback, lost message: %s", strmsgin);
+                                   } else {
+                                        socket = this->sockets->get(this->sockets, zitems[i].socket);
+                                        on_pollin(I(this), socket, strmsgin);
+                                   }
+                              }
+                         }
+                         found = true;
+                    }
+
+                    if (zitems[i].revents & ZMQ_POLLOUT) {
+                         on_pollout = this->on_pollout->get(this->on_pollout, zitems[i].socket);
+                         if (on_pollout != NULL) {
+                              if (on_pollout == NULL) {
+                                   this->log(warn, "No pollout callback");
+                              } else {
+                                   socket = this->sockets->get(this->sockets, zitems[i].socket);
+                                   on_pollout(I(this), socket, (char * const *)&strmsgout);
+                                   if (strmsgout != NULL) {
+                                        zmqcheck(this->log, zmq_send(zitems[i].socket, strmsgout, strlen(strmsgout), 0), warn);
+                                   }
+                              }
+                         }
+                         found = true;
+                    }
+               }
+
+               if (!found && this->on_timeout != NULL) {
+                    this->on_timeout(I(this));
+               }
+          }
      } while (this->running);
 }
 
@@ -126,13 +213,14 @@ static void free_poller(yacad_zmq_poller_impl_t *this) {
 static yacad_zmq_poller_t poller_fn = {
      .on_pollin=(yacad_zmq_poller_on_pollin_fn)on_pollin,
      .on_pollout=(yacad_zmq_poller_on_pollout_fn)on_pollout,
+     .set_timeout = (yacad_zmq_poller_set_timeout_fn)set_timeout,
      .stop=(yacad_zmq_poller_stop_fn)stop,
      .run=(yacad_zmq_poller_run_fn)run,
      .free=(yacad_zmq_poller_free_fn)free_poller,
 };
 
 static unsigned int pointer_hash(const void *key) {
-     return (unsigned int)(key);
+     return (unsigned int)(key - NULL);
 }
 
 static unsigned int pointer_compare(const void *key1, const void *key2) {
@@ -148,7 +236,10 @@ static void pointer_free(void *key) {
 }
 
 static cad_hash_keys_t hash_pointers = {
-     pointer_hash, pointer_compare, pointer_clone, pointer_free,
+     .hash = (cad_hash_keys_hash_fn)pointer_hash,
+     .compare = (cad_hash_keys_compare_fn)pointer_compare,
+     .clone = (cad_hash_keys_clone_fn)pointer_clone,
+     .free = (cad_hash_keys_free_fn)pointer_free,
 };
 
 static void read_stopsocket(yacad_zmq_poller_impl_t *poller, yacad_zmq_socket_impl_t *socket, const char *message) {
@@ -161,18 +252,19 @@ yacad_zmq_poller_t *yacad_zmq_poller_new(logger_t log) {
      yacad_zmq_poller_impl_t *result = malloc(sizeof(yacad_zmq_poller_impl_t));
      char *stopaddr;
      int n;
-     yacad_zmq_socket_t *stopsocket;
 
      n = snprintf("", 0, "inproc://zmq_poller_%p", result) + 1;
      stopaddr = malloc(n);
-     snprintf(stopaddr, n, "inproc://zmq_poller_%p", result)
+     snprintf(stopaddr, n, "inproc://zmq_poller_%p", result);
 
      result->fn = poller_fn;
      result->log = log;
      result->zitems = cad_new_array(stdlib_memory, sizeof(zmq_pollitem_t));
+     result->sockets = cad_new_hash(stdlib_memory, hash_pointers);
      result->on_pollin = cad_new_hash(stdlib_memory, hash_pointers);
      result->on_pollout = cad_new_hash(stdlib_memory, hash_pointers);
      result->stopaddr = stopaddr;
+     result->timeout = NULL;
      result->running = false;
      result->stopsocket = yacad_zmq_socket_bind(log, stopaddr, ZMQ_PAIR);
      I(result)->on_pollin(I(result), result->stopsocket, (yacad_on_pollin_fn)read_stopsocket);
