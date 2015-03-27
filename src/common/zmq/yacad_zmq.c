@@ -38,6 +38,10 @@ typedef struct yacad_zmq_poller_impl_s {
      yacad_zmq_socket_t *stopsocket;
 } yacad_zmq_poller_impl_t;
 
+static void send(yacad_zmq_socket_impl_t *this, const char *message) {
+     zmqcheck(this->log, zmq_send(this->socket, message, strlen(message), 0), warn);
+}
+
 static void free_socket(yacad_zmq_socket_impl_t *this) {
      zmqcheck(this->log, zmq_disconnect(this->socket, this->addr), error);
      zmqcheck(this->log, zmq_close(this->socket), error);
@@ -45,6 +49,7 @@ static void free_socket(yacad_zmq_socket_impl_t *this) {
 }
 
 static yacad_zmq_socket_t socket_fn = {
+     .send = (yacad_zmq_socket_send_fn)send,
      .free = (yacad_zmq_socket_free_fn)free_socket,
 };
 

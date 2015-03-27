@@ -45,9 +45,11 @@ struct yacad_zmq_poller_s {
 
 yacad_zmq_poller_t *yacad_zmq_poller_new(logger_t log);
 
+typedef void (*yacad_zmq_socket_send_fn)(yacad_zmq_socket_t *this, const char *message);
 typedef void (*yacad_zmq_socket_free_fn)(yacad_zmq_socket_t *this);
 
 struct yacad_zmq_socket_s {
+     yacad_zmq_socket_send_fn send;
      yacad_zmq_socket_free_fn free;
 };
 
