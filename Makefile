@@ -48,6 +48,7 @@ endif
 clean: $(LIBCADCLEAN) $(LIBYACJPCLEAN)
 	rm -rf target debian
 	rm -f src/_exp_entry_registry.c
+	rm -f Doxyfile
 
 exe: target/$(PROJECT)_core target/$(PROJECT)_runner
 
@@ -171,7 +172,7 @@ target/doc/latex/Makefile: target/doc/.doc
 target/doc/html/index.html: target/doc/.doc
 	sleep 1; touch $@
 
-target/doc/.doc: Doxyfile target/gendoc.sh $(shell ls -1 src/*.[ch] doc/*) Makefile
+target/doc/.doc: Doxyfile target/gendoc.sh $(shell find src -name '*.[ch]') $(shell ls -1 doc/*) Makefile
 	@echo "Generating documentation"
 	target/gendoc.sh
 	-doxygen -u $<
