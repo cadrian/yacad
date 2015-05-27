@@ -48,7 +48,6 @@ endif
 clean: $(LIBCADCLEAN) $(LIBYACJPCLEAN)
 	rm -rf target debian
 	rm -f src/_exp_entry_registry.c
-	rm -f Doxyfile
 
 exe: target/$(PROJECT)_core target/$(PROJECT)_runner
 

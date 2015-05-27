@@ -34,8 +34,11 @@ typedef struct yacad_scm_git_s {
      char _[0];
 } yacad_scm_git_t;
 
-#if LIBGIT2_SOVERSION == 21
+#if LIBGIT2_SOVERSION == 22
+#elif LIBGIT2_SOVERSION == 21
 static int yacad_init_counter = 0;
+#else
+#error "Unknown version of libgit2"
 #endif
 
 static void yacad_git_init(void) {
@@ -106,7 +109,11 @@ static bool_t check(yacad_scm_git_t *this) {
           // Could not connect to remote
      } else {
           this->fetch_percent = this->index_percent = -1;
+#if LIBGIT2_SOVERSION >= 22
+          downloaded = gitcheck(this->log, git_remote_download(this->remote, NULL), warn);
+#elif LIBGIT2_SOVERSION == 21
           downloaded = gitcheck(this->log, git_remote_download(this->remote), warn);
+#endif
           git_remote_disconnect(this->remote);
           if (downloaded) {
                if (!gitcheck(this->log, git_remote_update_tips(this->remote, NULL, NULL), error)) {
@@ -209,12 +216,18 @@ yacad_scm_t *yacad_scm_git_new(logger_t log, const char *root_path, json_value_t
      yacad_git_init();
 
      if (gitcheck(log, git_repository_open_bare(&(result->repo), result->root_path), debug)) {
+#if LIBGIT2_SOVERSION >= 22
+          if (!gitcheck(log, git_remote_delete(result->repo, REMOTE_NAME), error)) {
+               goto error;
+          }
+#elif LIBGIT2_SOVERSION == 21
           if (gitcheck(log, git_remote_load(&(result->remote), result->repo, REMOTE_NAME), debug)) {
                if (!gitcheck(log, git_remote_delete(result->remote), error)) {
                     goto error;
                }
                git_remote_free(result->remote);
           }
+#endif
      } else {
           log(info, "Initializing repository: %s", result->root_path);
           if (!gitcheck(log, git_repository_init(&(result->repo), result->root_path, true), error)) {

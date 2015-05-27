@@ -139,6 +139,9 @@ static void stop(yacad_zmq_poller_impl_t *this) {
      free_socket(stopsocket);
 }
 
+static void clean_nothing(void *hash, int index, const void *key, void *value, void *data) {
+}
+
 static void run(yacad_zmq_poller_impl_t *this, void *data) {
      zmq_pollitem_t *zitems = this->zitems->get(this->zitems, 0);
      int i, zn = this->zitems->count(this->zitems);
@@ -153,6 +156,7 @@ static void run(yacad_zmq_poller_impl_t *this, void *data) {
      zmq_msg_t msg;
      yacad_zmq_socket_t *socket;
      bool_t r;
+     unsigned int un;
 
      this->running = true;
      do {
@@ -230,10 +234,13 @@ static void run(yacad_zmq_poller_impl_t *this, void *data) {
           }
      } while (this->running);
 
+     while ((un = this->zitems->count(this->zitems)) > 0) {
+          free(this->zitems->del(this->zitems, un - 1));
+     }
      this->zitems->clear(this->zitems);
-     this->sockets->clean(this->sockets);
-     this->on_pollin->clean(this->on_pollin);
-     this->on_pollout->clean(this->on_pollout);
+     this->sockets->clean(this->sockets, clean_nothing, NULL);
+     this->on_pollin->clean(this->on_pollin, clean_nothing, NULL);
+     this->on_pollout->clean(this->on_pollout, clean_nothing, NULL);
 }
 
 static void free_poller(yacad_zmq_poller_impl_t *this) {

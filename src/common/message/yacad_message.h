@@ -32,6 +32,6 @@ struct yacad_message_s {
      yacad_message_free_fn free;
 };
 
-yacad_message_t *yacad_message_unserialize(logger_t log, char *serial, cad_hash_t *env);
+yacad_message_t *yacad_message_unserialize(logger_t log, const char *serial, cad_hash_t *env);
 
 #endif /* __YACAD_MESSAGE_H__ */

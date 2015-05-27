@@ -18,7 +18,7 @@
 #include "core/project/yacad_project.h"
 #include "core/tasklist/yacad_tasklist.h"
 #include "common/message/yacad_message_visitor.h"
-#include "common/smq/yacad_zmq.h"
+#include "common/zmq/yacad_zmq.h"
 
 #define INPROC_CHECK_ADDRESS "inproc://scheduler-check"
 #define INPROC_RUN_ADDRESS "inproc://scheduler-run"
@@ -109,7 +109,7 @@ static bool_t worker_on_timeout(yacad_zmq_poller_t *poller, void *data) {
      gettimeofday(&now, NULL);
      if (timercmp(&(context->this->worker_next_check.time), &now, <)) {
           context->zscheduler_check->send(context->zscheduler_check, MSG_CHECK);
-          check = true;
+          context->check = true;
      }
 
      return true;
@@ -117,6 +117,14 @@ static bool_t worker_on_timeout(yacad_zmq_poller_t *poller, void *data) {
 
 static void worker_timeout(yacad_zmq_poller_t *poller, struct timeval *timeout, void *data) {
      worker_context_t *context = (worker_context_t*)data;
+     int confgen;
+
+     confgen = context->this->conf->generation(context->this->conf);
+     if (context->check || confgen != context->this->worker_next_check.confgen) {
+          worker_next_check(context->this);
+          context->this->worker_next_check.confgen = confgen;
+          context->check = false;
+     }
 
      *timeout = context->this->worker_next_check.time;
 }
@@ -135,12 +143,6 @@ static void *worker_routine(yacad_scheduler_impl_t *this) {
      worker_context_t context = {false, false, this};
      yacad_zmq_socket_t *zscheduler_run;
      yacad_zmq_poller_t *zpoller;
-     int confgen;
-     int i;
-     char buffer[16];
-     size_t n = sizeof(buffer);
-     struct timeval now;
-     long timeout;
 
      set_thread_name("schedule worker");
 
@@ -161,7 +163,7 @@ static void *worker_routine(yacad_scheduler_impl_t *this) {
                } else {
                     zpoller->set_timeout(zpoller, worker_timeout, worker_on_timeout);
                     zpoller->on_pollin(zpoller, zscheduler_run, worker_on_pollin);
-                    zpoller->run(zpoller);
+                    zpoller->run(zpoller, &context);
 
                     context.zscheduler_check->free(context.zscheduler_check);
                }
@@ -366,7 +368,6 @@ static void run(yacad_scheduler_impl_t *this) {
                          zpoller->run(zpoller, this);
 
                          zpoller->free(zpoller);
-                         free(strmsg);
                     }
                     this->zevents->free(this->zevents);
                }

@@ -28,7 +28,7 @@ static void *logger_routine(void *nul) {
      yacad_zmq_socket_t *zscheduler;
      yacad_zmq_poller_t *zpoller;
 
-     zscheduler = yacad_zmq_socket_bind(NULL, INPROC_ADDRESS, ZMQ_REP);
+     zscheduler = yacad_zmq_socket_bind(NULL, INPROC_ADDRESS, ZMQ_PAIR);
      if (zscheduler != NULL) {
           set_thread_name("logger");
 
@@ -44,15 +44,17 @@ static void *logger_routine(void *nul) {
      return nul;
 }
 
-static void do_nothing(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message, void *data) {
-     if (message != NULL && strlen(message) > 0) {
-          fprintf(stderr, ">>>> %s <<<<\n", message);
-     }
-}
+//static bool_t do_nothing(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message, void *data) {
+//     if (message != NULL && strlen(message) > 0) {
+//          fprintf(stderr, ">>>> %s <<<<\n", message);
+//          return false;
+//     }
+//     return true;
+//}
 
 static void send_log(level_t level, char *format, va_list arg) {
      yacad_zmq_socket_t *zlogger;
-     yacad_zmq_poller_t *zpoller;
+     //yacad_zmq_poller_t *zpoller;
      struct timeval tm;
      char tag[256];
      static char *tagname[] = {
@@ -67,11 +69,11 @@ static void send_log(level_t level, char *format, va_list arg) {
      va_list zarg;
      char *logmsg;
 
-     zlogger = yacad_zmq_socket_connect(NULL, INPROC_ADDRESS, ZMQ_REQ);
+     zlogger = yacad_zmq_socket_connect(NULL, INPROC_ADDRESS, ZMQ_PAIR);
      if (zlogger != NULL) {
-          zpoller = yacad_zmq_poller_new(NULL);
-          if (zpoller != NULL) {
-               zpoller->on_pollin(zpoller, zlogger, do_nothing);
+          //zpoller = yacad_zmq_poller_new(NULL);
+          //if (zpoller != NULL) {
+          //     zpoller->on_pollin(zpoller, zlogger, do_nothing);
 
                gettimeofday(&tm, NULL);
                tag[255] = '\0';
@@ -89,9 +91,9 @@ static void send_log(level_t level, char *format, va_list arg) {
 
                zlogger->send(zlogger, logmsg);
 
-               zpoller->run(zpoller, NULL);
-               zpoller->free(zpoller);
-          }
+          //     zpoller->run(zpoller, NULL);
+          //     zpoller->free(zpoller);
+          //}
 
           zlogger->free(zlogger);
      }

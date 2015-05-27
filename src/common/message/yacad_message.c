@@ -21,7 +21,7 @@
 #include "yacad_message_reply_set_result.h"
 #include "common/json/yacad_json_finder.h"
 
-yacad_message_t *yacad_message_unserialize(logger_t log, char *serial, cad_hash_t *env) {
+yacad_message_t *yacad_message_unserialize(logger_t log, const char *serial, cad_hash_t *env) {
      yacad_message_t *result = NULL;
      json_input_stream_t *in = new_json_input_stream_from_string(serial, stdlib_memory);
      json_value_t *jserial = json_parse(in, NULL, stdlib_memory);

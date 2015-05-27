@@ -19,6 +19,7 @@
 #include "yacad.h"
 #include "core/conf/yacad_conf.h"
 #include "core/scheduler/yacad_scheduler.h"
+#include "common/zmq/yacad_zmq.h"
 
 static yacad_conf_t *conf = NULL;
 static yacad_scheduler_t *scheduler = NULL;

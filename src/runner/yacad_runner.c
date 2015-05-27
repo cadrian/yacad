@@ -18,6 +18,7 @@
 
 #include "yacad.h"
 #include "runner/conf/yacad_conf.h"
+#include "common/zmq/yacad_zmq.h"
 
 #define INPROC_RUN_ADDRESS "inproc://scheduler-run"
 #define MSG_STOP  "stop"
