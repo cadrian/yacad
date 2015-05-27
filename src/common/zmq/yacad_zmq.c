@@ -111,8 +111,9 @@ static void on_pollout(yacad_zmq_poller_impl_t *this, yacad_zmq_socket_impl_t *s
      register_action(this, socket, on_pollout, this->on_pollout, ZMQ_POLLOUT);
 }
 
-static void set_timeout(yacad_zmq_poller_impl_t *this, yacad_timeout_fn timeout) {
+static void set_timeout(yacad_zmq_poller_impl_t *this, yacad_timeout_fn timeout, yacad_on_timeout_fn on_timeout) {
      this->timeout = timeout;
+     this->on_timeout = on_timeout;
 }
 
 static void stop(yacad_zmq_poller_impl_t *this) {
@@ -121,7 +122,7 @@ static void stop(yacad_zmq_poller_impl_t *this) {
      free_socket(stopsocket);
 }
 
-static void run(yacad_zmq_poller_impl_t *this) {
+static void run(yacad_zmq_poller_impl_t *this, void *data) {
      zmq_pollitem_t *zitems = this->zitems->get(this->zitems, 0);
      int i, zn = this->zitems->count(this->zitems);
      struct timeval now, tmout;
@@ -134,6 +135,7 @@ static void run(yacad_zmq_poller_impl_t *this) {
      const char *strmsgout;
      zmq_msg_t msg;
      yacad_zmq_socket_t *socket;
+     bool_t r;
 
      this->running = true;
      do {
@@ -141,7 +143,7 @@ static void run(yacad_zmq_poller_impl_t *this) {
                timeout = -1;
           } else {
                gettimeofday(&now, NULL);
-               this->timeout(I(this), &tmout);
+               this->timeout(I(this), &tmout, data);
                timeout = 1000L * (tmout.tv_sec - now.tv_sec);
                if (timeout < 0) {
                     timeout = 0;
@@ -152,6 +154,7 @@ static void run(yacad_zmq_poller_impl_t *this) {
                this->running = false;
           } else {
                found = false;
+               r = true;
                for (i = 0; i < zn; i++) {
 
                     if (zitems[i].revents & ZMQ_POLLIN) {
@@ -178,7 +181,8 @@ static void run(yacad_zmq_poller_impl_t *this) {
                                         this->log(warn, "No pollin callback, lost message: %s", strmsgin);
                                    } else {
                                         socket = this->sockets->get(this->sockets, zitems[i].socket);
-                                        on_pollin(I(this), socket, strmsgin);
+                                        r = on_pollin(I(this), socket, strmsgin, data);
+                                        this->running &= r;
                                    }
                               }
                          }
@@ -192,7 +196,8 @@ static void run(yacad_zmq_poller_impl_t *this) {
                                    this->log(warn, "No pollout callback");
                               } else {
                                    socket = this->sockets->get(this->sockets, zitems[i].socket);
-                                   on_pollout(I(this), socket, (char * const *)&strmsgout);
+                                   r = on_pollout(I(this), socket, (char * const *)&strmsgout, data);
+                                   this->running &= r;
                                    if (strmsgout != NULL) {
                                         zmqcheck(this->log, zmq_send(zitems[i].socket, strmsgout, strlen(strmsgout), 0), warn);
                                    }
@@ -203,13 +208,22 @@ static void run(yacad_zmq_poller_impl_t *this) {
                }
 
                if (!found && this->on_timeout != NULL) {
-                    this->on_timeout(I(this));
+                    this->running = this->on_timeout(I(this), data);
                }
           }
      } while (this->running);
+
+     this->zitems->clear(this->zitems);
+     this->sockets->clean(this->sockets);
+     this->on_pollin->clean(this->on_pollin);
+     this->on_pollout->clean(this->on_pollout);
 }
 
 static void free_poller(yacad_zmq_poller_impl_t *this) {
+     this->zitems->free(this->zitems);
+     this->sockets->free(this->sockets);
+     this->on_pollin->free(this->on_pollin);
+     this->on_pollout->free(this->on_pollout);
      this->stopsocket->free(this->stopsocket);
      free(this->stopaddr);
      free(this);

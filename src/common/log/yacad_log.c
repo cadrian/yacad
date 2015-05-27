@@ -22,8 +22,9 @@
 #undef zmqcheck
 #define zmqcheck(zmqaction) __zmqcheck(NULL, (zmqaction), error, #zmqaction, __FILE__, __LINE__)
 
-static void do_log(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message) {
+static bool_t do_log(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message, void *data) {
      fprintf(stderr, "%s\n", message);
+     return true;
 }
 
 static void *logger_routine(void *nul) {
@@ -37,7 +38,7 @@ static void *logger_routine(void *nul) {
           zpoller = yacad_zmq_poller_new(NULL);
           if (zpoller != NULL) {
                zpoller->on_pollin(zpoller, zscheduler, do_log);
-               zpoller->run(zpoller);
+               zpoller->run(zpoller, NULL);
                zpoller->free(zpoller);
           }
           zscheduler->free(zscheduler);
@@ -46,7 +47,7 @@ static void *logger_routine(void *nul) {
      return nul;
 }
 
-static void do_nothing(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message) {
+static void do_nothing(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message, void *data) {
      if (message != NULL && strlen(message) > 0) {
           fprintf(stderr, ">>>> %s <<<<\n", message);
      }
@@ -91,7 +92,7 @@ static void send_log(level_t level, char *format, va_list arg) {
 
                zlogger->send(zlogger, logmsg);
 
-               zpoller->run(zpoller);
+               zpoller->run(zpoller, NULL);
                zpoller->free(zpoller);
           }
 
