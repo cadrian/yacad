@@ -171,7 +171,7 @@ static void run(yacad_zmq_poller_impl_t *this, void *data) {
                }
           }
 
-          if (!zmqcheck(this->log, zmq_poll(zitems, n, timeout), debug)) {
+          if (!zmqcheck(this->log, zmq_poll(zitems, zn, timeout), debug)) {
                this->running = false;
           } else {
                found = false;
