@@ -102,6 +102,7 @@ yacad_zmq_socket_t *yacad_zmq_socket_connect(logger_t log, const char *addr, int
 static void register_action(yacad_zmq_poller_impl_t *this, yacad_zmq_socket_impl_t *socket, void *action, cad_hash_t *actions, short event) {
      int i, n = this->zitems->count(this->zitems);
      zmq_pollitem_t *zitem = NULL, *zitem_tmp;
+     zmq_pollitem_t zitem_new;
 
      for (i = 0; zitem == NULL && i < n; i++) {
           zitem_tmp = this->zitems->get(this->zitems, i);
@@ -110,11 +111,11 @@ static void register_action(yacad_zmq_poller_impl_t *this, yacad_zmq_socket_impl
           }
      }
      if (zitem == NULL) {
-          zitem = malloc(sizeof(zmq_pollitem_t));
-          memset(zitem, 0, sizeof(zmq_pollitem_t));
-          zitem->socket = socket->socket;
-          this->zitems->insert(this->zitems, n, zitem);
+          memset(&zitem_new, 0, sizeof(zmq_pollitem_t));
+          zitem_new.socket = socket->socket;
+          zitem = this->zitems->insert(this->zitems, n, &zitem_new);
      }
+
      zitem->events |= event;
      actions->set(actions, socket->socket, action);
      this->sockets->set(this->sockets, socket->socket, socket);
@@ -156,7 +157,6 @@ static void run(yacad_zmq_poller_impl_t *this, void *data) {
      zmq_msg_t msg;
      yacad_zmq_socket_t *socket;
      bool_t r;
-     unsigned int un;
 
      this->running = true;
      do {
@@ -234,9 +234,6 @@ static void run(yacad_zmq_poller_impl_t *this, void *data) {
           }
      } while (this->running);
 
-     while ((un = this->zitems->count(this->zitems)) > 0) {
-          free(this->zitems->del(this->zitems, un - 1));
-     }
      this->zitems->clear(this->zitems);
      this->sockets->clean(this->sockets, clean_nothing, NULL);
      this->on_pollin->clean(this->on_pollin, clean_nothing, NULL);
