@@ -15,56 +15,46 @@
 */
 
 #include "yacad_log.h"
+#include "common/zmq/yacad_zmq.h"
 
 #define INPROC_ADDRESS "inproc://logger"
 
 #undef zmqcheck
 #define zmqcheck(zmqaction) __zmqcheck(NULL, (zmqaction), error, #zmqaction, __FILE__, __LINE__)
 
-static void *logger_routine(void *nul) {
-     void *zcontext = get_zmq_context();
-     void *zscheduler = zmq_socket(zcontext, ZMQ_REP);
-     zmq_msg_t msg;
-     int n, c = 0, r;
-     char *logmsg = NULL;
-     zmq_pollitem_t zitems[] = {
-          {zscheduler, 0, ZMQ_POLLIN, 0},
-     };
-     bool_t running = true;
+static void do_log(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message) {
+     fprintf(stderr, "%s\n", message);
+}
 
+static void *logger_routine(void *nul) {
+     yacad_zmq_socket_t *zscheduler;
+     yacad_zmq_poller_t *zpoller;
+
+     zscheduler = yacad_zmq_socket_bind(NULL, INPROC_ADDRESS, ZMQ_REP);
      if (zscheduler != NULL) {
           set_thread_name("logger");
 
-          zmqcheck(zmq_bind(zscheduler, INPROC_ADDRESS));
-          do {
-               if (!zmqcheck(r = zmq_poll(zitems, 1, -1))) {
-                    running = false;
-               } else if (zitems[0].revents & ZMQ_POLLIN) {
-                    zmqcheck(zmq_msg_init(&msg));
-                    zmqcheck(n = zmq_msg_recv(&msg, zscheduler, 0));
-                    if (n > 0) {
-                         if (c < n) {
-                              logmsg = realloc(logmsg, n);
-                              c = n;
-                         }
-                         memcpy(logmsg, zmq_msg_data(&msg), n);
-                         fprintf(stderr, "%s\n", logmsg);
-                    }
-                    zmqcheck(zmq_msg_close(&msg));
-                    zmqcheck(zmq_send(zscheduler, "", 0, 0));
-               }
-          } while (running);
-
-          zmqcheck(zmq_close(zscheduler));
-          free(logmsg);
+          zpoller = yacad_zmq_poller_new(NULL);
+          if (zpoller != NULL) {
+               zpoller->on_pollin(zpoller, zscheduler, do_log);
+               zpoller->run(zpoller);
+               zpoller->free(zpoller);
+          }
+          zscheduler->free(zscheduler);
      }
 
      return nul;
 }
 
+static void do_nothing(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message) {
+     if (message != NULL && strlen(message) > 0) {
+          fprintf(stderr, ">>>> %s <<<<\n", message);
+     }
+}
+
 static void send_log(level_t level, char *format, va_list arg) {
-     void *zcontext = get_zmq_context();
-     void *zlogger = zmq_socket(zcontext, ZMQ_REQ);
+     yacad_zmq_socket_t *zlogger;
+     yacad_zmq_poller_t *zpoller;
      struct timeval tm;
      char tag[256];
      static char *tagname[] = {
@@ -75,36 +65,37 @@ static void send_log(level_t level, char *format, va_list arg) {
           "TRACE",
      };
      char date[20];
-     zmq_msg_t msg;
      int t, n;
      va_list zarg;
      char *logmsg;
 
+     zlogger = yacad_zmq_socket_connect(NULL, INPROC_ADDRESS, ZMQ_REQ);
      if (zlogger != NULL) {
-          gettimeofday(&tm, NULL);
-          tag[255] = '\0';
-          t = snprintf(tag, 255, "%s.%06ld [%s] {%s} ", datetime(tm.tv_sec, date), tm.tv_usec, tagname[level], get_thread_name());
+          zpoller = yacad_zmq_poller_new(NULL);
+          if (zpoller != NULL) {
+               zpoller->on_pollin(zpoller, zlogger, do_nothing);
 
-          va_copy(zarg, arg);
-          n = vsnprintf("", 0, format, zarg);
-          va_end(zarg);
+               gettimeofday(&tm, NULL);
+               tag[255] = '\0';
+               t = snprintf(tag, 255, "%s.%06ld [%s] {%s} ", datetime(tm.tv_sec, date), tm.tv_usec, tagname[level], get_thread_name());
 
-          logmsg = alloca(t + n + 1);
-          t = snprintf(logmsg, t + 1, "%s", tag);
-          va_copy(zarg, arg);
-          n = vsnprintf(logmsg + t, n + 1, format, zarg);
-          va_end(zarg);
+               va_copy(zarg, arg);
+               n = vsnprintf("", 0, format, zarg);
+               va_end(zarg);
 
-          zmqcheck(zmq_connect(zlogger, INPROC_ADDRESS));
+               logmsg = alloca(t + n + 1);
+               t = snprintf(logmsg, t + 1, "%s", tag);
+               va_copy(zarg, arg);
+               n = vsnprintf(logmsg + t, n + 1, format, zarg);
+               va_end(zarg);
 
-          zmqcheck(zmq_msg_init_size(&msg, t + n + 1));
-          memcpy(zmq_msg_data(&msg), logmsg, t + n + 1);
-          zmqcheck(zmq_msg_send(&msg, zlogger, 0));
-          zmqcheck(zmq_msg_close(&msg));
+               zlogger->send(zlogger, logmsg);
 
-          zmqcheck(zmq_recv(zlogger, "", 0, 0));
+               zpoller->run(zpoller);
+               zpoller->free(zpoller);
+          }
 
-          zmqcheck(zmq_close(zlogger));
+          zlogger->free(zlogger);
      }
 }
 
