@@ -62,13 +62,7 @@ const char *yacad_version(void);
 const char *datetime(time_t t, char *tmbuf);
 int mkpath(const char *dir, mode_t mode);
 
-void *get_zmq_context(void);
-void del_zmq_context(void);
-
 const char *get_thread_name(void);
 void set_thread_name(const char *tn);
-
-bool_t __zmqcheck(logger_t log, int zmqerr, level_t level, const char *zmqaction, const char *file, unsigned int line);
-#define zmqcheck(log, zmqaction, level) __zmqcheck(log, (zmqaction), (level), #zmqaction, __FILE__, __LINE__)
 
 #endif /* __YACAD_H__ */

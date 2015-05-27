@@ -37,7 +37,7 @@ int main(int argc, const char * const *argv) {
 
      set_thread_name("core");
 
-     get_zmq_context();
+     yacad_zmq_init();
 
      conf = yacad_conf_new();
      conf->log(info, "yaCAD core version %s - READY", yacad_version());
@@ -47,12 +47,12 @@ int main(int argc, const char * const *argv) {
      sigemptyset(&action.sa_mask);
      if (sigaction(SIGINT, &action, NULL) < 0) {
           conf->log(error, "Could not set SIGINT action handler");
-          del_zmq_context();
+          yacad_zmq_term();
           exit(1);
      }
      if (sigaction(SIGTERM, &action, NULL) < 0) {
           conf->log(error, "Could not set SIGTERM action handler");
-          del_zmq_context();
+          yacad_zmq_term();
           exit(1);
      }
 
@@ -61,10 +61,10 @@ int main(int argc, const char * const *argv) {
 
      conf->log(info, "yaCAD stopped.");
 
-     del_zmq_context();
-
      scheduler->free(scheduler);
      //conf->free(conf); // TODO to check
+
+     yacad_zmq_term();
 
      return 0;
 }

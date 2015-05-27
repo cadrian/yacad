@@ -56,4 +56,7 @@ struct yacad_zmq_socket_s {
 yacad_zmq_socket_t *yacad_zmq_socket_bind(logger_t log, const char *addr, int type);
 yacad_zmq_socket_t *yacad_zmq_socket_connect(logger_t log, const char *addr, int type);
 
+void yacad_zmq_init(void);
+void yacad_zmq_term(void);
+
 #endif /* __YACAD_ZMQ_H__ */

@@ -19,9 +19,6 @@
 
 #define INPROC_ADDRESS "inproc://logger"
 
-#undef zmqcheck
-#define zmqcheck(zmqaction) __zmqcheck(NULL, (zmqaction), error, #zmqaction, __FILE__, __LINE__)
-
 static bool_t do_log(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message, void *data) {
      fprintf(stderr, "%s\n", message);
      return true;

@@ -41,19 +41,19 @@ int main(int argc, const char * const *argv) {
 
      set_thread_name("runner");
 
-     get_zmq_context();
+     yacad_zmq_init();
 
      action.sa_handler = handle_signal;
      action.sa_flags = 0;
      sigemptyset(&action.sa_mask);
      if (sigaction(SIGINT, &action, NULL) < 0) {
           conf->log(error, "Could not set SIGINT action handler");
-          del_zmq_context();
+          yacad_zmq_term();
           exit(1);
      }
      if (sigaction(SIGTERM, &action, NULL) < 0) {
           conf->log(error, "Could not set SIGTERM action handler");
-          del_zmq_context();
+          yacad_zmq_term();
           exit(1);
      }
 
@@ -62,7 +62,7 @@ int main(int argc, const char * const *argv) {
 
      run();
 
-     del_zmq_context();
+     yacad_zmq_term();
 
      return 0;
 }

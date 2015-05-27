@@ -60,26 +60,6 @@ const char *yacad_version(void) {
      return version;
 }
 
-static void *zmq_context = NULL;
-
-void *get_zmq_context(void) {
-     if (zmq_context == NULL) {
-          zmq_context = zmq_ctx_new();
-          if (zmq_context == NULL) {
-               fprintf(stderr, "**** ERROR: could not create 0MQ context\n");
-               exit(1);
-          }
-     }
-     return zmq_context;
-}
-
-void del_zmq_context(void) {
-     if (zmq_context != NULL) {
-          zmqcheck(NULL, zmq_ctx_term(zmq_context), error);
-          zmq_context = NULL;
-     }
-}
-
 static __thread const char *thread_name = NULL;
 
 const char *get_thread_name(void) {
@@ -88,21 +68,4 @@ const char *get_thread_name(void) {
 
 void set_thread_name(const char *tn) {
      thread_name = tn;
-}
-
-bool_t __zmqcheck(logger_t log, int zmqerr, level_t level, const char *zmqaction, const char *file, unsigned int line) {
-     int result = true;
-     char *paren;
-     int len, err;
-     if (zmqerr == -1) {
-          result = false;
-          if (log != NULL) {
-               err = zmq_errno();
-               paren = strchrnul(zmqaction, '(');
-               len = paren - zmqaction;
-               log(debug, "Error %d in %s line %u: %s", err, file, line, zmqaction);
-               log(level, "%.*s: error: %s", len, zmqaction, zmq_strerror(err));
-          }
-     }
-     return result;
 }

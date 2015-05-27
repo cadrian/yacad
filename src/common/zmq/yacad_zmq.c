@@ -16,6 +16,24 @@
 
 #include "yacad_zmq.h"
 
+static bool_t __zmqcheck(logger_t log, int zmqerr, level_t level, const char *zmqaction, const char *file, unsigned int line);
+#define zmqcheck(log, zmqaction, level) __zmqcheck(log, (zmqaction), (level), #zmqaction, __FILE__, __LINE__)
+
+static void *zmq_context = NULL;
+
+void yacad_zmq_init(void) {
+     zmq_context = zmq_ctx_new();
+     if (zmq_context == NULL) {
+          fprintf(stderr, "**** ERROR: could not create 0MQ context\n");
+          exit(1);
+     }
+}
+
+void yacad_zmq_term(void) {
+     zmqcheck(NULL, zmq_ctx_term(zmq_context), error);
+     zmq_context = NULL;
+}
+
 typedef struct yacad_zmq_socket_impl_s {
      yacad_zmq_socket_t fn;
      logger_t log;
@@ -55,8 +73,7 @@ static yacad_zmq_socket_t socket_fn = {
 
 static yacad_zmq_socket_impl_t *yacad_zmq_socket_new(logger_t log, const char *addr, int type, int (*connect)(void *, const char *)) {
      yacad_zmq_socket_impl_t *result = NULL;
-     void *context = get_zmq_context();
-     void *socket = zmq_socket(context, type);
+     void *socket = zmq_socket(zmq_context, type);
      if (socket != NULL) {
           if (!zmqcheck(log, connect(socket, addr), error)) {
                zmqcheck(log, zmq_close(socket), warn);
@@ -289,4 +306,21 @@ yacad_zmq_poller_t *yacad_zmq_poller_new(logger_t log) {
      I(result)->on_pollin(I(result), result->stopsocket, (yacad_on_pollin_fn)read_stopsocket);
 
      return I(result);
+}
+
+static bool_t __zmqcheck(logger_t log, int zmqerr, level_t level, const char *zmqaction, const char *file, unsigned int line) {
+     int result = true;
+     char *paren;
+     int len, err;
+     if (zmqerr == -1) {
+          result = false;
+          if (log != NULL) {
+               err = zmq_errno();
+               paren = strchrnul(zmqaction, '(');
+               len = paren - zmqaction;
+               log(debug, "Error %d in %s line %u: %s", err, file, line, zmqaction);
+               log(level, "%.*s: error: %s", len, zmqaction, zmq_strerror(err));
+          }
+     }
+     return result;
 }
