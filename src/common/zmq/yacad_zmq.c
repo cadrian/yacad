@@ -212,16 +212,14 @@ static void run(yacad_zmq_poller_impl_t *this, void *data) {
 
                     if (zitems[i].revents & ZMQ_POLLOUT) {
                          on_pollout = this->on_pollout->get(this->on_pollout, zitems[i].socket);
-                         if (on_pollout != NULL) {
-                              if (on_pollout == NULL) {
-                                   this->log(warn, "No pollout callback");
-                              } else {
-                                   socket = this->sockets->get(this->sockets, zitems[i].socket);
-                                   r = on_pollout(I(this), socket, (char * const *)&strmsgout, data);
-                                   this->running &= r;
-                                   if (strmsgout != NULL) {
-                                        zmqcheck(this->log, zmq_send(zitems[i].socket, strmsgout, strlen(strmsgout), 0), warn);
-                                   }
+                         if (on_pollout == NULL) {
+                              this->log(warn, "No pollout callback");
+                         } else {
+                              socket = this->sockets->get(this->sockets, zitems[i].socket);
+                              r = on_pollout(I(this), socket, (char * const *)&strmsgout, data);
+                              this->running &= r;
+                              if (strmsgout != NULL) {
+                                   zmqcheck(this->log, zmq_send(zitems[i].socket, strmsgout, strlen(strmsgout), 0), warn);
                               }
                          }
                          found = true;
