@@ -51,3 +51,65 @@ The gui.
 
 * Talks with the Core to manage the conf and the task list
 * Allow to download artifacts and task logs
+
+# Details
+
+## JSON messages structure
+
+### Get Task
+
+This message is initiated by a runner, asking the core for something
+to do.
+
+#### Runner -> Core: query
+
+    {
+        "type": "query_get_task",
+        "runner": <runnerid>
+    }
+
+#### Core -> Runner: reply
+
+    {
+        "type": "reply_get_task",
+        "runner": <runnerid>,
+        "task": {
+            "id": <taskid>,
+            "timestamp": <date>,
+            "status": <status>,
+            "taskindex": <taskindex>,
+            "task": <task>,
+            "project_name": <projectname>,
+            "env": <environment>
+        },
+        "scm": <scm>
+    }
+
+### Set Result
+
+This message is initiated by a runner, sending a task execution result
+to the core.
+
+#### Runner -> Core: query
+
+    {
+        "type": "query_set_result",
+        "runner": <runnerid>,
+        "task": {
+            "id": <taskid>,
+            "timestamp": <date>,
+            "status": <status>,
+            "taskindex": <taskindex>,
+            "task": <task>,
+            "project_name": <projectname>,
+            "env": <environment>
+        },
+        "success": true / false
+    }
+
+#### Core -> Runner: reply
+
+    {
+        "type": "reply_set_result",
+        "runner": <runnerid>
+    }
