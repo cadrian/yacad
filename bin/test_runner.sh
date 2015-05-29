@@ -1,7 +1,8 @@
 #!/bin/bash
-cd $(dirname $(readlink -f $0))/../test
+root=$(dirname $(readlink -f $0))
+cd $root/../test/integ
 
-sed 's!#PATH#!'"$(cd ..; pwd)"'!g' runner.conf.template > runner.conf
+sed 's!#PATH#!'"$root"'!g' runner.conf.template > runner.conf
 
 if [ ${gdb-no} = yes ]; then
     exec gdb ../target/yacad_runner --args ../target/yacad_runner "$@"
