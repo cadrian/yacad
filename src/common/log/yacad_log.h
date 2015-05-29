@@ -68,6 +68,6 @@ typedef int (*logger_fn) (const char *format, ...) __attribute__((format(printf,
 
 logger_t get_logger(level_t level, logger_fn logger);
 
-int log_on_stderr(const char *format, ...);
+extern logger_fn log_on_stderr;
 
 #endif /* __YACAD_LOG_H__ */

@@ -60,7 +60,7 @@ exe: unit-test target/$(PROJECT)_core target/$(PROJECT)_runner
 unit-test: $(TEST_EXE)
 	cd target; for exe in $^; do echo 'Executing test:' $$(basename $$exe); $${exe#target/} || exit 1; done
 
-target/test/%.exe: test/unit/%.c $(TEST_OBJ) $(LIBCAD) $(LIBYACJP)
+target/test/%.exe: test/unit/%.c test/unit/_*.c $(TEST_OBJ) $(LIBCAD) $(LIBYACJP)
 	mkdir -p $(shell dirname $@)
 	@echo "Compiling test: $<"
 	$(CC) $(CFLAGS) -o $@ -I src $(LIBCADINCLUDE) $(LIBYACJPINCLUDE) $< $(TEST_OBJ) $(LIBDEPEND)

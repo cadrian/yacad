@@ -28,6 +28,7 @@ typedef struct yacad_cron_impl_s {
      yacad_cron_t fn;
      logger_t log;
      cronspec_t spec;
+     get_current_minute_fn get_current_minute;
 } yacad_cron_impl_t;
 
 #define BIT_1(field, bit) do { (field) |= 1UL << (bit); } while(0)
@@ -57,10 +58,7 @@ static struct timeval next(yacad_cron_impl_t *this) {
      struct tm tm;
      bool_t done = false;
 
-     time(&t);
-     localtime_r(&t, &tm);
-     tm.tm_sec = 0;
-     tm.tm_yday = 0;
+     tm = this->get_current_minute();
      tm.tm_min++;
 
      do {
@@ -203,7 +201,7 @@ static yacad_cron_t impl_fn = {
      .free = (yacad_cron_free_fn)free_,
 };
 
-yacad_cron_t *yacad_cron_parse(logger_t log, const char *cronspec) {
+yacad_cron_t *yacad_cron_parse(logger_t log, const char *cronspec, get_current_minute_fn gcm) {
      yacad_cron_impl_t *result = malloc(sizeof(yacad_cron_impl_t));
      int offset = 0;
 
@@ -221,5 +219,21 @@ yacad_cron_t *yacad_cron_parse(logger_t log, const char *cronspec) {
      skip_blanks(cronspec, &offset);
      result->spec.dow = parse_field(cronspec, &offset, 7);
 
+     result->get_current_minute = gcm;
+
      return I(result);
 }
+
+static struct tm dgcm(void) {
+     time_t t;
+     struct tm result;
+
+     time(&t);
+     localtime_r(&t, &result);
+     result.tm_sec = 0;
+     result.tm_yday = 0;
+
+     return result;
+}
+
+get_current_minute_fn default_get_current_minute = dgcm;

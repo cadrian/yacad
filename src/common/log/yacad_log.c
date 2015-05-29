@@ -120,7 +120,7 @@ logger_t get_logger(level_t level, logger_fn fn) {
      return NULL;
 }
 
-int log_on_stderr(const char *format, ...) {
+static int serr(const char *format, ...) {
      int result;
      va_list arg;
      va_start(arg, format);
@@ -128,3 +128,5 @@ int log_on_stderr(const char *format, ...) {
      va_end(arg);
      return result;
 }
+
+logger_fn log_on_stderr = serr;

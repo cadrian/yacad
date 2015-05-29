@@ -24,11 +24,15 @@ typedef struct yacad_cron_s yacad_cron_t;
 typedef struct timeval (*yacad_cron_next_fn)(yacad_cron_t *this);
 typedef void (*yacad_cron_free_fn)(yacad_cron_t *this);
 
+typedef struct tm (*get_current_minute_fn)(void);
+
 struct yacad_cron_s {
      yacad_cron_next_fn next;
      yacad_cron_free_fn free;
 };
 
-yacad_cron_t *yacad_cron_parse(logger_t log, const char *cronspec);
+yacad_cron_t *yacad_cron_parse(logger_t log, const char *cronspec, get_current_minute_fn gcm);
+
+extern get_current_minute_fn default_get_current_minute;
 
 #endif /* __YACAD_CRON_H__ */

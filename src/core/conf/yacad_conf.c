@@ -270,7 +270,7 @@ static void read_projects(yacad_conf_impl_t *this) {
                          if (crondesc == NULL) {
                               crondesc = strdup("* * * * *");
                          }
-                         cron = yacad_cron_parse(I(this)->log, crondesc);
+                         cron = yacad_cron_parse(I(this)->log, crondesc, default_get_current_minute);
 
                          // Prepare jtasks
                          varray->visit(varray, jproject, "tasks");
