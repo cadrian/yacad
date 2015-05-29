@@ -9,7 +9,7 @@
 \usepackage{listings}
 \usepackage{color}
 \usepackage{ifthen}
-\usepackage[table]{xcolor}
+\usepackage[usenames,dvipsnames,table]{xcolor}
 \usepackage{textcomp}
 \usepackage{alltt}
 \usepackage{ifpdf}
@@ -36,17 +36,20 @@
 \usepackage{doxygen}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
-\lstset{language=C++,inputencoding=utf8,basicstyle=\footnotesize,breaklines=true,breakatwhitespace=true,tabsize=8,numbers=left }
 \usepackage{libertine}
 \usepackage{inconsolata}
-\allsectionsfont{\usefont{T1}{fxb}{bc}{n}\selectfont\color{darkgray}} % force again to override Doxygen defaults
-\renewcommand*\familydefault{\rmdefault}
+
+\lstset{language=C++,inputencoding=utf8,basicstyle=\footnotesize,breaklines=true,breakatwhitespace=true,tabsize=8,numbers=left }
+
+\renewcommand*\familydefault{\rmdefault} % or \sfdefault for biolinum
+\allsectionsfont{\usefont{T1}{LinuxBiolinumT-OsF}{m}{n}\selectfont\color{MidnightBlue}}
+
 \makeindex
 \setcounter{tocdepth}{3}
 
 \renewcommand{\entrylabel}[1]{
    {\parbox[b]{\labelwidth-4pt}{\makebox[0pt][l]{%
-   \usefont{T1}{fxb}{bc}{n}\color{darkgray}#1}\vspace{1.5\baselineskip}}}}
+   \usefont{T1}{LinuxBiolinumT-OsF}{m}{n}\selectfont\color{MidnightBlue}#1}\vspace{1.5\baselineskip}}}}
 
 %% fancyheader empty
 \providecommand{\clearemptydoublepage} % Style recto-verso
@@ -55,6 +58,7 @@
 \begin{document}
 \hypersetup{pageanchor=false,citecolor=blue}
 \begin{titlepage}
+  \usefont{T1}{LinuxBiolinumT-OsF}{m}{n}\selectfont
   \vspace*{3cm}
   \begin{center}
     \begin{tabular}{p{10cm}}

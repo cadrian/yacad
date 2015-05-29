@@ -155,6 +155,7 @@ target/doc/latex/refman.pdf: target/doc/latex/Makefile target/doc/latex/version.
 #	remove the \batchmode on the first line:
 	mv target/doc/latex/refman.tex target/doc/latex/refman.tex.orig
 	tail -n +2 target/doc/latex/refman.tex.orig > target/doc/latex/refman.tex
+	find target/doc/latex -name \*.tex -exec sed -r 's/(section|paragraph)\*/\1/g' -i {} \;
 	-yes x | $(MAKE) -C target/doc/latex > target/doc/make.log 2>&1
 #	cat target/doc/latex/refman.log
 
