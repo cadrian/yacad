@@ -40,7 +40,7 @@ int main(int argc, const char * const *argv) {
 
      yacad_zmq_init();
 
-     conf = yacad_conf_new();
+     conf = yacad_core_conf_new();
      conf->log(info, "yaCAD core version %s - READY", yacad_version());
 
      action.sa_handler = handle_signal;

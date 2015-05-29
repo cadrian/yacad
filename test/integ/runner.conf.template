@@ -10,5 +10,5 @@
         "name": "runner1",
         "arch": "foo",
     },
-    "work_path": "#PATH#/test/runners/runner1"
+    "work_path": "#PATH#/test/integ/runners/runner1"
 }

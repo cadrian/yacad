@@ -4,6 +4,10 @@ PROJECT=yacad
 COMMON_OBJ=$(shell { find src/common -name '*.c'; ls src/*.c; } | sed -r 's|^src/|target/out/|g;s|\.c|.o|g')
 CORE_OBJ=$(shell find src/core -name '*.c' | sed -r 's|^src/|target/out/|g;s|\.c|.o|g')
 RUNNER_OBJ=$(shell find src/runner -name '*.c' | sed -r 's|^src/|target/out/|g;s|\.c|.o|g')
+TEST_OBJ=$(shell { find src -name \*.c | while read c; do grep -q 'int main' $$c || echo $$c; done; } | sed -r 's|^src/|target/out/|g;s|\.c|.o|g')
+TEST_EXE=$(shell find test/unit -name '_*' -prune -o -name '*.c' -print | sed -r 's|^test/unit/|target/test/|g;s|\.c|.exe|g')
+
+LIBDEPEND=-L target -lcad -lyacjp -lm -lgit2 -lsqlite3 -lzmq -lpthread
 
 ifeq "$(wildcard ../libcad)" ""
 LIBCAD=
@@ -38,6 +42,8 @@ endif
 CFLAGS ?= -g -D_GNU_SOURCE
 LDFLAGS ?=
 
+CFLAGS += -Wall -Werror
+
 ifeq "$(wildcard /usr/bin/doxygen)" ""
 all: exe
 else
@@ -49,20 +55,28 @@ clean: $(LIBCADCLEAN) $(LIBYACJPCLEAN)
 	rm -rf target debian
 	rm -f src/_exp_entry_registry.c
 
-exe: target/$(PROJECT)_core target/$(PROJECT)_runner
+exe: unit-test target/$(PROJECT)_core target/$(PROJECT)_runner
+
+unit-test: $(TEST_EXE)
+	cd target; for exe in $^; do echo 'Executing test:' $$(basename $$exe); $${exe#target/} || exit 1; done
+
+target/test/%.exe: test/unit/%.c $(TEST_OBJ) $(LIBCAD) $(LIBYACJP)
+	mkdir -p $(shell dirname $@)
+	@echo "Compiling test: $<"
+	$(CC) $(CFLAGS) -o $@ -I src $(LIBCADINCLUDE) $(LIBYACJPINCLUDE) $< $(TEST_OBJ) $(LIBDEPEND)
 
 target/$(PROJECT)_core: $(COMMON_OBJ) $(CORE_OBJ) $(LIBCAD) $(LIBYACJP)
 	@echo "Compiling executable: $@"
-	$(CC) $(CFLAGS) -o $@ $(COMMON_OBJ) $(CORE_OBJ) -Wall -Werror -L target -lcad -lyacjp -lm -lgit2 -lsqlite3 -lzmq -lpthread
+	$(CC) $(CFLAGS) -o $@ $(COMMON_OBJ) $(CORE_OBJ) $(LIBDEPEND)
 
 target/$(PROJECT)_runner: $(COMMON_OBJ) $(RUNNER_OBJ) $(LIBCAD) $(LIBYACJP)
 	@echo "Compiling executable: $@"
-	$(CC) $(CFLAGS) -o $@ $(COMMON_OBJ) $(RUNNER_OBJ) -Wall -Werror -L target -lcad -lyacjp -lm -lgit2 -lsqlite3 -lzmq -lpthread
+	$(CC) $(CFLAGS) -o $@ $(COMMON_OBJ) $(RUNNER_OBJ) $(LIBDEPEND)
 
 target/out/%.o: src/%.c src/*.h Makefile
 	mkdir -p $(shell dirname $@)
 	@echo "Compiling object: $<"
-	$(CC) $(CFLAGS) -I src $(LIBCADINCLUDE) $(LIBYACJPINCLUDE) -Wall -Werror -c $< -o $@
+	$(CC) $(CFLAGS) -I src $(LIBCADINCLUDE) $(LIBYACJPINCLUDE) -c $< -o $@
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # libcad
@@ -192,4 +206,4 @@ debian/changelog: debian/changelog.raw
 debian/changelog.raw:
 	./build/build.sh
 
-.PHONY: all clean libcadclean doc install release.main release.doc
+.PHONY: all clean unit-test libcadclean doc install release.main release.doc

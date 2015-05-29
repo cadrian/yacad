@@ -54,8 +54,20 @@ typedef enum {
  *
  * @return the length of the message after expansion; 0 if the log is not emitted because of the level
  */
-typedef int (*logger_t) (level_t level, char *format, ...) __PRINTF__;
+typedef int (*logger_t) (level_t level, const char *format, ...) __PRINTF__;
 
-logger_t get_logger(level_t level);
+/**
+ * The low-level logger. Usually printf(3).
+ *
+ * @param[in] format the message format
+ * @param[in] ... the message arguments
+ *
+ * @return the length of the message after expansion; 0 if the log is not emitted because of the level
+ */
+typedef int (*logger_fn) (const char *format, ...) __attribute__((format(printf, 1, 2)));
+
+logger_t get_logger(level_t level, logger_fn logger);
+
+int log_on_stderr(const char *format, ...);
 
 #endif /* __YACAD_LOG_H__ */

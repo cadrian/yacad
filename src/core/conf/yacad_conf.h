@@ -40,6 +40,6 @@ struct yacad_conf_s {
      yacad_conf_free_fn free;
 };
 
-yacad_conf_t *yacad_conf_new(void);
+yacad_conf_t *yacad_core_conf_new(void);
 
 #endif /* __YACAD_CONF_H__ */

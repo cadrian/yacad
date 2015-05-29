@@ -3,7 +3,7 @@
         "level": "debug",
     },
     "core": {
-        "root_path": "#PATH#/test/projects", // for tests
+        "root_path": "#PATH#/test/integ/projects", // for tests
         "endpoint": "tcp://*:1989", // the default is 1789
         "events": "tcp://*:1991", // the default is 1791
     },

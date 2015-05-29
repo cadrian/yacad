@@ -58,7 +58,7 @@ int main(int argc, const char * const *argv) {
           exit(1);
      }
 
-     conf = yacad_conf_new();
+     conf = yacad_runner_conf_new();
      conf->log(info, "yaCAD runner version %s - READY", yacad_version());
 
      run();

@@ -20,11 +20,11 @@
 #define INPROC_ADDRESS "inproc://logger"
 
 static bool_t do_log(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message, void *data) {
-     fprintf(stderr, "%s\n", message);
+     ((logger_fn)data)("%s\n", message);
      return true;
 }
 
-static void *logger_routine(void *nul) {
+static void *logger_routine(logger_fn fn) {
      yacad_zmq_socket_t *zscheduler;
      yacad_zmq_poller_t *zpoller;
 
@@ -35,24 +35,16 @@ static void *logger_routine(void *nul) {
           zpoller = yacad_zmq_poller_new(NULL);
           if (zpoller != NULL) {
                zpoller->on_pollin(zpoller, zscheduler, do_log);
-               zpoller->run(zpoller, NULL);
+               zpoller->run(zpoller, fn);
                zpoller->free(zpoller);
           }
           zscheduler->free(zscheduler);
      }
 
-     return nul;
+     return NULL;
 }
 
-//static bool_t do_nothing(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message, void *data) {
-//     if (message != NULL && strlen(message) > 0) {
-//          fprintf(stderr, ">>>> %s <<<<\n", message);
-//          return false;
-//     }
-//     return true;
-//}
-
-static void send_log(level_t level, char *format, va_list arg) {
+static void send_log(level_t level, const char *format, va_list arg) {
      yacad_zmq_socket_t *zlogger;
      //yacad_zmq_poller_t *zpoller;
      struct timeval tm;
@@ -71,36 +63,28 @@ static void send_log(level_t level, char *format, va_list arg) {
 
      zlogger = yacad_zmq_socket_connect(NULL, INPROC_ADDRESS, ZMQ_PAIR);
      if (zlogger != NULL) {
-          //zpoller = yacad_zmq_poller_new(NULL);
-          //if (zpoller != NULL) {
-          //     zpoller->on_pollin(zpoller, zlogger, do_nothing);
+          gettimeofday(&tm, NULL);
+          tag[255] = '\0';
+          t = snprintf(tag, 255, "%s.%06ld [%s] {%s} ", datetime(tm.tv_sec, date), tm.tv_usec, tagname[level], get_thread_name());
 
-               gettimeofday(&tm, NULL);
-               tag[255] = '\0';
-               t = snprintf(tag, 255, "%s.%06ld [%s] {%s} ", datetime(tm.tv_sec, date), tm.tv_usec, tagname[level], get_thread_name());
+          va_copy(zarg, arg);
+          n = vsnprintf("", 0, format, zarg);
+          va_end(zarg);
 
-               va_copy(zarg, arg);
-               n = vsnprintf("", 0, format, zarg);
-               va_end(zarg);
+          logmsg = alloca(t + n + 1);
+          t = snprintf(logmsg, t + 1, "%s", tag);
+          va_copy(zarg, arg);
+          n = vsnprintf(logmsg + t, n + 1, format, zarg);
+          va_end(zarg);
 
-               logmsg = alloca(t + n + 1);
-               t = snprintf(logmsg, t + 1, "%s", tag);
-               va_copy(zarg, arg);
-               n = vsnprintf(logmsg + t, n + 1, format, zarg);
-               va_end(zarg);
-
-               zlogger->send(zlogger, logmsg);
-
-          //     zpoller->run(zpoller, NULL);
-          //     zpoller->free(zpoller);
-          //}
+          zlogger->send(zlogger, logmsg);
 
           zlogger->free(zlogger);
      }
 }
 
 #define DEFUN_LOGGER(__level) \
-     static int __level##_logger(level_t level, char *format, ...) {    \
+     static int __level##_logger(level_t level, const char *format, ...) { \
           int result = 0;                                               \
           va_list arg;                                                  \
           if (level <= __level) {                                       \
@@ -117,13 +101,13 @@ DEFUN_LOGGER(info)
 DEFUN_LOGGER(debug)
 DEFUN_LOGGER(trace)
 
-logger_t get_logger(level_t level) {
+logger_t get_logger(level_t level, logger_fn fn) {
      static volatile bool_t init = false;
      static pthread_t logger;
 
      if (!init) {
           init = true;
-          pthread_create(&logger, NULL, (void*(*)(void*))logger_routine, NULL);
+          pthread_create(&logger, NULL, (void*(*)(void*))logger_routine, fn);
      }
 
      switch(level) {
@@ -134,4 +118,13 @@ logger_t get_logger(level_t level) {
      case trace: return trace_logger;
      }
      return NULL;
+}
+
+int log_on_stderr(const char *format, ...) {
+     int result;
+     va_list arg;
+     va_start(arg, format);
+     result = vfprintf(stderr, format, arg);
+     va_end(arg);
+     return result;
 }

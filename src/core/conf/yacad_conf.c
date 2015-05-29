@@ -133,15 +133,15 @@ static void set_logger(yacad_conf_impl_t *this) {
           level = alloca(n);
           i = jlevel->utf8(jlevel, level, n);
           if (!strncmp("error", level, i)) {
-               this->fn.log = get_logger(error);
+               this->fn.log = get_logger(error, log_on_stderr);
           } else if (!strncmp("warn", level, i)) {
-               this->fn.log = get_logger(warn);
+               this->fn.log = get_logger(warn, log_on_stderr);
           } else if (!strncmp("info", level, i)) {
-               this->fn.log = get_logger(info);
+               this->fn.log = get_logger(info, log_on_stderr);
           } else if (!strncmp("debug", level, i)) {
-               this->fn.log = get_logger(debug);
+               this->fn.log = get_logger(debug, log_on_stderr);
           } else if (!strncmp("trace", level, i)) {
-               this->fn.log = get_logger(trace);
+               this->fn.log = get_logger(trace, log_on_stderr);
           } else {
                fprintf(stderr, "**** Unknown level: '%s' (ignored)\n", level);
           }
@@ -311,7 +311,7 @@ static void read_projects(yacad_conf_impl_t *this) {
      I(vprojects)->free(I(vprojects));
 }
 
-yacad_conf_t *yacad_conf_new(void) {
+yacad_conf_t *yacad_core_conf_new(void) {
      // The actual conf is read only once; after, the JSON object is shared.
      static yacad_conf_impl_t *ref = NULL;
 
@@ -319,7 +319,7 @@ yacad_conf_t *yacad_conf_new(void) {
      int i;
 
      result->fn = impl_fn;
-     result->fn.log = get_logger(debug);
+     result->fn.log = get_logger(debug, log_on_stderr);
 
      result->projects = cad_new_hash(stdlib_memory, cad_hash_strings);
      result->runners = cad_new_hash(stdlib_memory, cad_hash_strings);
