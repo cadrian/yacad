@@ -32,15 +32,15 @@ static int output(const char *format, ...) {
      va_start(arg, format);
      va_copy(zarg, arg);
 
-     n = vsnprintf("", 0, format, arg);
+     n = vsnprintf("", 0, format, arg) + 1;
      if (n > output_capacity - output_count) {
           if (output_capacity == 0) {
                output_capacity = 4096;
                output_data = malloc(output_capacity);
           }
-          do {
+          while (n > output_capacity - output_count) {
                output_capacity *= 2;
-          } while (n > output_capacity - output_count);
+          }
           output_data = realloc(output_data, output_capacity);
      }
      n = vsnprintf(output_data + output_count, output_capacity - output_count, format, zarg);
