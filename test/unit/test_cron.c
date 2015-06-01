@@ -53,6 +53,9 @@ static int run_test(const char *format, int min, int hour, int mday, int mon, in
           log = get_logger(info);
      }
 
+     memset(&expected, 0, sizeof(struct tm));
+     memset(&actual, 0, sizeof(struct tm));
+
      expected.tm_min = min;
      expected.tm_hour = hour;
      expected.tm_mday = mday;
@@ -65,7 +68,8 @@ static int run_test(const char *format, int min, int hour, int mday, int mon, in
      cron = yacad_cron_parse(log, format);
 
      tv = cron->next(cron);
-     localtime_r(&tv.tv_sec, &actual);
+     t = tv.tv_sec;
+     localtime_r(&t, &actual);
 
      log(trace, "#### %d,%d,%d,%d,%d / %d,%d,%d,%d,%d ####\n",
          expected.tm_min, expected.tm_hour, expected.tm_mday, expected.tm_mon, expected.tm_year,
