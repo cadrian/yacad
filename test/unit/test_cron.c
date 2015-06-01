@@ -87,7 +87,5 @@ int test(void) {
      assert(run_test("10 * * * *", 10, 1, 1, 1, 2015));
      assert(run_test("1 * * * *", 1, 2, 1, 1, 2015));
 
-     fprintf(stderr, "Done.\n");
-
      return result;
 }
