@@ -125,6 +125,8 @@ static void vvisit(yacad_json_finder_impl_t *this, json_value_t *value, va_list 
      int n;
      char *path;
 
+     this->found = false;
+
      va_copy(args, vargs);
      n = vsnprintf("", 0, this->pathformat, args) + 1;
      va_end(args);
