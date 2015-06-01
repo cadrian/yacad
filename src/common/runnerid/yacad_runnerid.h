@@ -41,7 +41,7 @@ struct yacad_runnerid_s {
      yacad_runnerid_free_fn free;
 };
 
-yacad_runnerid_t *yacad_runnerid_unserialize(logger_t log, char *serial);
+yacad_runnerid_t *yacad_runnerid_unserialize(logger_t log, const char *serial);
 yacad_runnerid_t *yacad_runnerid_new(logger_t log, json_value_t *desc);
 
 #endif /* __YACAD_RUNNERID_H__ */

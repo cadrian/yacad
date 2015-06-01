@@ -105,7 +105,7 @@ static yacad_runnerid_t impl_fn = {
      .free = (yacad_runnerid_free_fn)free_,
 };
 
-yacad_runnerid_t *yacad_runnerid_unserialize(logger_t log, char *serial) {
+yacad_runnerid_t *yacad_runnerid_unserialize(logger_t log, const char *serial) {
      yacad_runnerid_t *result = NULL;
      json_input_stream_t *in = new_json_input_stream_from_string(serial, stdlib_memory);
      json_value_t *desc = json_parse(in, NULL, stdlib_memory);
@@ -123,17 +123,21 @@ yacad_runnerid_t *yacad_runnerid_new(logger_t log, json_value_t *desc) {
      json_string_t *jname, *jarch;
      size_t szname = 0, szarch = 0;
 
+     log(trace, "looking for name...");
      v->visit(v, desc, "name");
      jname = v->get_string(v);
      if (jname != NULL) {
           szname = jname->utf8(jname, "", 0) + 1;
      }
+     log(trace, "szname = %lu", (unsigned long)szname);
 
+     log(trace, "looking for arch...");
      v->visit(v, desc, "arch");
      jarch = v->get_string(v);
      if (jarch != NULL) {
           szarch = jarch->utf8(jarch, "", 0) + 1;
      }
+     log(trace, "szarch = %lu", (unsigned long)szarch);
 
      result = malloc(sizeof(yacad_runnerid_impl_t) + szname + szarch);
      result->fn = impl_fn;
