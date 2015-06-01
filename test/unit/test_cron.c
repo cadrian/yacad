@@ -45,20 +45,19 @@ static int run_test(const char *format, int min, int hour, int mday, int mon, in
      yacad_cron_t *cron;
      time_t t;
      static logger_t log = NULL;
-     struct tm expected = {
-          .tm_sec = 0,
-          .tm_min = min,
-          .tm_hour = hour,
-          .tm_mday = mday,
-          .tm_mon = mon,
-          .tm_year = year - 1900
-     };
+     struct tm expected = {0,};
      struct tm actual = {0,};
      struct timeval tv;
 
      if (log == NULL) {
           log = get_logger(info);
      }
+
+     expected.tm_min = min;
+     expected.tm_hour = hour;
+     expected.tm_mday = mday;
+     expected.tm_mon = mon;
+     expected.tm_year = year - 1900;
 
      t = mktime(&expected);
      localtime_r(&t, &expected);
