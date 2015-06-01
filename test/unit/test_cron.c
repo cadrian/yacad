@@ -45,22 +45,20 @@ static int run_test(const char *format, int min, int hour, int mday, int mon, in
      yacad_cron_t *cron;
      time_t t;
      static logger_t log = NULL;
-     struct tm expected = {0,};
-     struct tm actual = {0,};
+     struct tm expected = {
+          .tm_sec = 0,
+          .tm_min = min,
+          .tm_hour = hour,
+          .tm_mday = mday,
+          .tm_mon = mon,
+          .tm_year = year - 1900,
+     };
+     struct tm actual;
      struct timeval tv;
 
      if (log == NULL) {
           log = get_logger(info);
      }
-
-     memset(&expected, 0, sizeof(struct tm));
-     memset(&actual, 0, sizeof(struct tm));
-
-     expected.tm_min = min;
-     expected.tm_hour = hour;
-     expected.tm_mday = mday;
-     expected.tm_mon = mon;
-     expected.tm_year = year - 1900;
 
      t = mktime(&expected);
      localtime_r(&t, &expected);
@@ -68,14 +66,17 @@ static int run_test(const char *format, int min, int hour, int mday, int mon, in
      cron = yacad_cron_parse(log, format);
 
      tv = cron->next(cron);
-     t = tv.tv_sec;
-     localtime_r(&t, &actual);
+     localtime_r(&tv.tv_sec, &actual);
 
      log(trace, "#### %d,%d,%d,%d,%d / %d,%d,%d,%d,%d ####\n",
          expected.tm_min, expected.tm_hour, expected.tm_mday, expected.tm_mon, expected.tm_year,
          actual.tm_min, actual.tm_hour, actual.tm_mday, actual.tm_mon, actual.tm_year);
 
-     return !memcmp(&expected, &actual, sizeof(struct tm));
+     return expected.tm_min == actual.tm_min
+          && expected.tm_hour == actual.tm_hour
+          && expected.tm_mday == actual.tm_mday
+          && expected.tm_mon == actual.tm_mon
+          && expected.tm_year == actual.tm_year;
 }
 
 int test(void) {
