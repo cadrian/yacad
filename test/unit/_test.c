@@ -65,6 +65,10 @@ int main(void) {
      yacad_zmq_init();
      result = test();
      yacad_zmq_term();
+
+     if (result) {
+          fprintf(stderr, "**** %d test%s failed.\n", result, result == 1 ? "" : "s");
+     }
      return result;
 }
 
