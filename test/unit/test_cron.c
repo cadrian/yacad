@@ -44,6 +44,7 @@ static struct tm mock_get_current_minute_fn(void) {
 static int run_test(const char *format, int min, int hour, int mday, int mon, int year) {
      yacad_cron_t *cron;
      time_t t;
+     static logger_t log = NULL;
      struct tm expected = {
           .tm_sec = 0,
           .tm_min = min,
@@ -54,10 +55,14 @@ static int run_test(const char *format, int min, int hour, int mday, int mon, in
      };
      struct tm actual;
      struct timeval tv;
+     if (log == NULL) {
+          log = get_logger(trace);
+     }
+
      t = mktime(&expected);
      localtime_r(&t, &expected);
-     set_get_current_minute_fn(mock_get_current_minute_fn);
-     cron = yacad_cron_parse(get_logger(trace), format);
+
+     cron = yacad_cron_parse(log, format);
 
      tv = cron->next(cron);
      localtime_r(&tv.tv_sec, &actual);
@@ -67,6 +72,7 @@ static int run_test(const char *format, int min, int hour, int mday, int mon, in
 
 int test(void) {
      int result = 0;
+     set_get_current_minute_fn(mock_get_current_minute_fn);
 
      assert(run_test("* * * * *", 2, 1, 1, 1, 2015));
      assert(run_test("10 * * * *", 10, 1, 1, 1, 2015));

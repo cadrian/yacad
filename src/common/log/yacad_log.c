@@ -57,7 +57,6 @@ static void *logger_routine(logger_fn fn) {
 
 static void send_log(level_t level, const char *format, va_list arg) {
      yacad_zmq_socket_t *zlogger;
-     //yacad_zmq_poller_t *zpoller;
      struct timeval tm;
      char tag[256];
      static char *tagname[] = {
