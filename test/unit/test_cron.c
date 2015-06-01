@@ -29,7 +29,7 @@ static struct tm mock_get_current_minute_fn(void) {
           .tm_hour = 1,
           .tm_mday = 1,
           .tm_mon = 1,
-          .tm_year = 2015
+          .tm_year = 115
      };
      static int init = 0;
      if (!init) {
@@ -51,12 +51,13 @@ static int run_test(const char *format, int min, int hour, int mday, int mon, in
           .tm_hour = hour,
           .tm_mday = mday,
           .tm_mon = mon,
-          .tm_year = year
+          .tm_year = year - 1900
      };
-     struct tm actual;
+     struct tm actual = {0,};
      struct timeval tv;
+
      if (log == NULL) {
-          log = get_logger(trace);
+          log = get_logger(info);
      }
 
      t = mktime(&expected);
@@ -67,6 +68,10 @@ static int run_test(const char *format, int min, int hour, int mday, int mon, in
      tv = cron->next(cron);
      localtime_r(&tv.tv_sec, &actual);
 
+     log(trace, "#### %d,%d,%d,%d,%d / %d,%d,%d,%d,%d ####\n",
+         expected.tm_min, expected.tm_hour, expected.tm_mday, expected.tm_mon, expected.tm_year,
+         actual.tm_min, actual.tm_hour, actual.tm_mday, actual.tm_mon, actual.tm_year);
+
      return !memcmp(&expected, &actual, sizeof(struct tm));
 }
 
@@ -76,7 +81,9 @@ int test(void) {
 
      assert(run_test("* * * * *", 2, 1, 1, 1, 2015));
      assert(run_test("10 * * * *", 10, 1, 1, 1, 2015));
-     // TODO assert(run_test("1 * * * *", 1, 2, 1, 1, 2015));
+     assert(run_test("1 * * * *", 1, 2, 1, 1, 2015));
+
+     fprintf(stderr, "Done.\n");
 
      return result;
 }

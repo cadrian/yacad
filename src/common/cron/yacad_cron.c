@@ -55,7 +55,7 @@ static bool_t lookup(yacad_cron_impl_t *this, unsigned long field, int *min, int
      this->log(trace, "lookup %s: bitfield is %lx", fieldname, field);
      if (ISBIT(field, *min)) {
           this->log(trace, "lookup %s: found min %2d", fieldname, *min);
-          result = done = true;
+          result = true;
      } else {
           for (i = *min + 1; !done && i < max; i++) {
                this->log(trace, "lookup %s: checking bit %d/%d => %s", fieldname, i, max, ISBIT(field, i) ? "true" : "false");
@@ -65,8 +65,11 @@ static bool_t lookup(yacad_cron_impl_t *this, unsigned long field, int *min, int
                     done = true;
                }
           }
+          if (!done) {
+               (*min)++;
+          }
      }
-     this->log(info, "lookup %s: min=%d, result=%s", fieldname, *min, result ? "true" : "false");
+     this->log(trace, "lookup %s: min=%d, result=%s", fieldname, *min, result ? "true" : "false");
      return result;
 }
 
@@ -81,25 +84,19 @@ static struct timeval next(yacad_cron_impl_t *this) {
 
      do {
           /* inspired by http://stackoverflow.com/questions/321494/calculate-when-a-cron-job-will-be-executed-then-next-time */
-          this->log(trace, ">>>> more");
           t = mktime(&tm);
           localtime_r(&t, &tm);
+          this->log(trace, ">>>> more: %s", ctime(&t));
           if (!lookup(this, this->spec.mon, &(tm.tm_mon), 12, "month")) {
-               this->log(trace, ">>>> month");
                tm.tm_mday = tm.tm_wday = tm.tm_hour = tm.tm_min = 0;
           } else if (!lookup(this, this->spec.dom, &(tm.tm_mday), 31, "day of month")) {
-               this->log(trace, ">>>> day of month");
                tm.tm_hour = tm.tm_min = 0;
           } else if (!lookup(this, this->spec.dow, &(tm.tm_wday), 7, "day of week")) {
-               this->log(trace, ">>>> day of week");
                tm.tm_hour = tm.tm_min = 0;
           } else if (!lookup(this, this->spec.hour, &(tm.tm_hour), 24, "hour")) {
-               this->log(trace, ">>>> hour");
                tm.tm_min = 0;
           } else if (!lookup(this, this->spec.min, &(tm.tm_min), 60, "minute")) {
-               this->log(trace, ">>>> minute");
           } else {
-               this->log(trace, ">>>> done");
                done = true;
           }
      } while (!done);

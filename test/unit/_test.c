@@ -58,26 +58,29 @@ static int test_logger(const char *format, ...) {
      return n;
 }
 
-int main(void) {
-     int result;
-     set_thread_name("test");
-     set_logger_fn(test_logger);
-     yacad_zmq_init();
-     result = test();
-     yacad_zmq_term();
-
-     if (result) {
-          fprintf(stderr, "**** %d test%s failed.\n", result, result == 1 ? "" : "s");
-     }
-     return result;
-}
-
 void __wait_for_logger(void) {
      volatile int count = -1;
      do {
           count = ACCESS_ONCE(output_count);
           usleep(10000);
      } while (ACCESS_ONCE(output_count) > count);
+}
+
+int main(void) {
+     int result;
+     set_thread_name("test");
+     set_logger_fn(test_logger);
+     yacad_zmq_init();
+
+     result = test();
+
+     __wait_for_logger();
+     yacad_zmq_term();
+
+     if (result) {
+          fprintf(stderr, "**** %d test%s failed.\n", result, result == 1 ? "" : "s");
+     }
+     return result;
 }
 
 int __assert(int test, const char *format, ...) {
