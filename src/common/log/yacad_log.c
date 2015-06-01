@@ -39,7 +39,7 @@ static void *logger_routine(logger_fn fn) {
      yacad_zmq_socket_t *zscheduler;
      yacad_zmq_poller_t *zpoller;
 
-     zscheduler = yacad_zmq_socket_bind(NULL, INPROC_ADDRESS, ZMQ_PAIR);
+     zscheduler = yacad_zmq_socket_bind(NULL, INPROC_ADDRESS, ZMQ_REP);
      if (zscheduler != NULL) {
           set_thread_name("logger");
 
@@ -71,7 +71,7 @@ static void send_log(level_t level, const char *format, va_list arg) {
      va_list zarg;
      char *logmsg;
 
-     zlogger = yacad_zmq_socket_connect(NULL, INPROC_ADDRESS, ZMQ_PAIR);
+     zlogger = yacad_zmq_socket_connect(NULL, INPROC_ADDRESS, ZMQ_REQ);
      if (zlogger != NULL) {
           gettimeofday(&tm, NULL);
           tag[255] = '\0';
