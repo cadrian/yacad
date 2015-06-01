@@ -61,12 +61,15 @@ unit-test: $(TEST_EXE)
 	cd target; for exe in $^; do echo 'Executing test:' $$(basename $$exe); $${exe#target/} || exit 1; done
 	@echo Tests done.
 
-target/test/%.exe: test/unit/%.c test/unit/_*.c $(TEST_OBJ) $(LIBCAD) $(LIBYACJP)
+target/test/%.exe: target/test/%.out
+	cp $< $@
+	@echo "Executing test: $@"
+	cd target; test/$(shell basename $@)
+
+target/test/%.out: test/unit/%.c test/unit/_*.c $(TEST_OBJ) $(LIBCAD) $(LIBYACJP)
 	mkdir -p $(shell dirname $@)
 	@echo "Compiling test: $<"
 	$(CC) $(CFLAGS) -o $@ -I src $(LIBCADINCLUDE) $(LIBYACJPINCLUDE) $< test/unit/_*.c $(TEST_OBJ) $(LIBDEPEND)
-	@echo "Executing test: $@"
-	cd target; test/$(shell basename $@)
 
 target/$(PROJECT)_core: $(COMMON_OBJ) $(CORE_OBJ) $(LIBCAD) $(LIBYACJP)
 	@echo "Compiling executable: $@"
