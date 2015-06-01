@@ -14,13 +14,15 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "_test.c"
+#include "test.h"
+
+#include "common/log/yacad_log.h"
 
 int test(void) {
      int result = 0;
-     logger_t log = get_logger(info, test_logger);
+     logger_t log = get_logger(info);
      log(error, "hello world");
-     wait_for_logger();
-     assert(!strcmp(output_data + 26, " [ERROR] {test} hello world\n"));
+     assert(logger_data() != NULL);
+     assert(!result && !strcmp(logger_data() + 26, " [ERROR] {test} hello world\n"));
      return result;
 }

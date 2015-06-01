@@ -19,6 +19,17 @@
 
 #define INPROC_ADDRESS "inproc://logger"
 
+static int serr(const char *format, ...) {
+     int result;
+     va_list arg;
+     va_start(arg, format);
+     result = vfprintf(stderr, format, arg);
+     va_end(arg);
+     return result;
+}
+
+static logger_fn current_logger_fn = serr;
+
 static bool_t do_log(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message, void *data) {
      ((logger_fn)data)("%s\n", message);
      return true;
@@ -101,13 +112,13 @@ DEFUN_LOGGER(info)
 DEFUN_LOGGER(debug)
 DEFUN_LOGGER(trace)
 
-logger_t get_logger(level_t level, logger_fn fn) {
+logger_t get_logger(level_t level) {
      static volatile bool_t init = false;
      static pthread_t logger;
 
      if (!init) {
           init = true;
-          pthread_create(&logger, NULL, (void*(*)(void*))logger_routine, fn);
+          pthread_create(&logger, NULL, (void*(*)(void*))logger_routine, current_logger_fn);
      }
 
      switch(level) {
@@ -120,13 +131,6 @@ logger_t get_logger(level_t level, logger_fn fn) {
      return NULL;
 }
 
-static int serr(const char *format, ...) {
-     int result;
-     va_list arg;
-     va_start(arg, format);
-     result = vfprintf(stderr, format, arg);
-     va_end(arg);
-     return result;
+void set_logger_fn(logger_fn fn) {
+     current_logger_fn = fn;
 }
-
-logger_fn log_on_stderr = serr;

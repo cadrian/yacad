@@ -16,6 +16,20 @@
 
 #include "yacad_cron.h"
 
+static struct tm dgcm(void) {
+     time_t t;
+     struct tm result;
+
+     time(&t);
+     localtime_r(&t, &result);
+     result.tm_sec = 0;
+     result.tm_yday = 0;
+
+     return result;
+}
+
+static get_current_minute_fn current_get_current_minute = dgcm;
+
 typedef struct {
      unsigned long min:60;
      unsigned long hour:24;
@@ -66,14 +80,19 @@ static struct timeval next(yacad_cron_impl_t *this) {
           t = mktime(&tm);
           localtime_r(&t, &tm);
           if (!lookup(this, this->spec.mon, &(tm.tm_mon), 12, "month")) {
+               this->log(trace, "month");
                tm.tm_mday = tm.tm_wday = tm.tm_hour = tm.tm_min = 0;
           } else if (!lookup(this, this->spec.dom, &(tm.tm_mday), 31, "day of month")) {
+               this->log(trace, "day of month");
                tm.tm_hour = tm.tm_min = 0;
           } else if (!lookup(this, this->spec.dow, &(tm.tm_wday), 7, "day of week")) {
+               this->log(trace, "day of week");
                tm.tm_hour = tm.tm_min = 0;
           } else if (!lookup(this, this->spec.hour, &(tm.tm_hour), 24, "hour")) {
+               this->log(trace, "hour");
                tm.tm_min = 0;
           } else if (!lookup(this, this->spec.min, &(tm.tm_min), 60, "minute")) {
+               this->log(trace, "minute");
           } else {
                done = true;
           }
@@ -201,7 +220,7 @@ static yacad_cron_t impl_fn = {
      .free = (yacad_cron_free_fn)free_,
 };
 
-yacad_cron_t *yacad_cron_parse(logger_t log, const char *cronspec, get_current_minute_fn gcm) {
+yacad_cron_t *yacad_cron_parse(logger_t log, const char *cronspec) {
      yacad_cron_impl_t *result = malloc(sizeof(yacad_cron_impl_t));
      int offset = 0;
 
@@ -219,21 +238,11 @@ yacad_cron_t *yacad_cron_parse(logger_t log, const char *cronspec, get_current_m
      skip_blanks(cronspec, &offset);
      result->spec.dow = parse_field(cronspec, &offset, 7);
 
-     result->get_current_minute = gcm;
+     result->get_current_minute = current_get_current_minute;
 
      return I(result);
 }
 
-static struct tm dgcm(void) {
-     time_t t;
-     struct tm result;
-
-     time(&t);
-     localtime_r(&t, &result);
-     result.tm_sec = 0;
-     result.tm_yday = 0;
-
-     return result;
+void set_get_current_minute_fn(get_current_minute_fn fn) {
+     current_get_current_minute = fn;
 }
-
-get_current_minute_fn default_get_current_minute = dgcm;

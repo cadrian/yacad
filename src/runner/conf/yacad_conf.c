@@ -123,15 +123,15 @@ static void set_logger(yacad_conf_impl_t *this) {
           level = alloca(n);
           i = jlevel->utf8(jlevel, level, n);
           if (!strncmp("error", level, i)) {
-               this->fn.log = get_logger(error, log_on_stderr);
+               this->fn.log = get_logger(error);
           } else if (!strncmp("warn", level, i)) {
-               this->fn.log = get_logger(warn, log_on_stderr);
+               this->fn.log = get_logger(warn);
           } else if (!strncmp("info", level, i)) {
-               this->fn.log = get_logger(info, log_on_stderr);
+               this->fn.log = get_logger(info);
           } else if (!strncmp("debug", level, i)) {
-               this->fn.log = get_logger(debug, log_on_stderr);
+               this->fn.log = get_logger(debug);
           } else if (!strncmp("trace", level, i)) {
-               this->fn.log = get_logger(trace, log_on_stderr);
+               this->fn.log = get_logger(trace);
           } else {
                fprintf(stderr, "**** Unknown level: '%s' (ignored)\n", level);
           }
@@ -194,7 +194,7 @@ yacad_conf_t *yacad_runner_conf_new(void) {
      int i;
 
      result->fn = impl_fn;
-     result->fn.log = get_logger(debug, log_on_stderr);
+     result->fn.log = get_logger(debug);
 
      result->filename = result->work_path = result->endpoint_name = result->events_name = NULL;
      result->json = NULL;

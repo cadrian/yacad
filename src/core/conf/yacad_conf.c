@@ -133,15 +133,15 @@ static void set_logger(yacad_conf_impl_t *this) {
           level = alloca(n);
           i = jlevel->utf8(jlevel, level, n);
           if (!strncmp("error", level, i)) {
-               this->fn.log = get_logger(error, log_on_stderr);
+               this->fn.log = get_logger(error);
           } else if (!strncmp("warn", level, i)) {
-               this->fn.log = get_logger(warn, log_on_stderr);
+               this->fn.log = get_logger(warn);
           } else if (!strncmp("info", level, i)) {
-               this->fn.log = get_logger(info, log_on_stderr);
+               this->fn.log = get_logger(info);
           } else if (!strncmp("debug", level, i)) {
-               this->fn.log = get_logger(debug, log_on_stderr);
+               this->fn.log = get_logger(debug);
           } else if (!strncmp("trace", level, i)) {
-               this->fn.log = get_logger(trace, log_on_stderr);
+               this->fn.log = get_logger(trace);
           } else {
                fprintf(stderr, "**** Unknown level: '%s' (ignored)\n", level);
           }
@@ -270,7 +270,7 @@ static void read_projects(yacad_conf_impl_t *this) {
                          if (crondesc == NULL) {
                               crondesc = strdup("* * * * *");
                          }
-                         cron = yacad_cron_parse(I(this)->log, crondesc, default_get_current_minute);
+                         cron = yacad_cron_parse(I(this)->log, crondesc);
 
                          // Prepare jtasks
                          varray->visit(varray, jproject, "tasks");
@@ -319,7 +319,7 @@ yacad_conf_t *yacad_core_conf_new(void) {
      int i;
 
      result->fn = impl_fn;
-     result->fn.log = get_logger(debug, log_on_stderr);
+     result->fn.log = get_logger(debug);
 
      result->projects = cad_new_hash(stdlib_memory, cad_hash_strings);
      result->runners = cad_new_hash(stdlib_memory, cad_hash_strings);

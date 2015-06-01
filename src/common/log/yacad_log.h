@@ -66,8 +66,20 @@ typedef int (*logger_t) (level_t level, const char *format, ...) __PRINTF__;
  */
 typedef int (*logger_fn) (const char *format, ...) __attribute__((format(printf, 1, 2)));
 
-logger_t get_logger(level_t level, logger_fn logger);
+/**
+ * Get a logger for the given level.
+ *
+ * @return the logger for the given level.
+ */
+logger_t get_logger(level_t level);
 
-extern logger_fn log_on_stderr;
+/**
+ * Set the low-level logging function. Must be called before \ref get_logger.
+ *
+ * Usually only for tests.
+ *
+ * @param[in] fn the logging function
+ */
+void set_logger_fn(logger_fn fn);
 
 #endif /* __YACAD_LOG_H__ */

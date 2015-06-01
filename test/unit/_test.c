@@ -24,34 +24,21 @@
 #include "common/log/yacad_log.h"
 #include "common/zmq/yacad_zmq.h"
 
-/**
- * The test to implement.
- *
- * @return the test status (0 is OK)
- */
-int test(void);
-
-int main(void) {
-     int result;
-     set_thread_name("test");
-     yacad_zmq_init();
-     result = test();
-     yacad_zmq_term();
-     return result;
-}
+#include "test.h"
 
 static int output_capacity = 0;
-static volatile int output_count = 0;
+static int output_count = 0;
 static char *output_data = NULL;
 
-int test_logger(const char *format, ...) {
-     va_list arg, zarg;
+static int test_logger(const char *format, ...) {
+     va_list arg;
      int n;
-     va_start(arg, format);
-     va_copy(zarg, arg);
 
-     n = vsnprintf("", 0, format, arg) + 1;
-     if (n > output_capacity - output_count) {
+     va_start(arg, format);
+     n = vfprintf(stderr, format, arg);
+     va_end(arg);
+
+     if (n > output_capacity - ACCESS_ONCE(output_count)) {
           if (output_capacity == 0) {
                output_capacity = 4096;
                output_data = malloc(output_capacity);
@@ -61,24 +48,46 @@ int test_logger(const char *format, ...) {
           }
           output_data = realloc(output_data, output_capacity);
      }
-     n = vsnprintf(output_data + output_count, output_capacity - output_count, format, zarg);
-     output_count += n;
 
-     va_end(zarg);
+     va_start(arg, format);
+     n = vsnprintf(ACCESS_ONCE(output_data) + ACCESS_ONCE(output_count), output_capacity - output_count, format, arg);
      va_end(arg);
+
+     output_count += n;
 
      return n;
 }
 
-void wait_for_logger(void) {
-     volatile int count = -1;
-     do {
-          count = output_count;
-          usleep(10000);
-     } while (output_count != count);
+int main(void) {
+     int result;
+     set_thread_name("test");
+     set_logger_fn(test_logger);
+     yacad_zmq_init();
+     result = test();
+     yacad_zmq_term();
+     return result;
 }
 
-#define assert(test) do if (!(test)) {                                  \
-               fprintf(stderr, "**** ASSERT FAILED: %s\n", #test);      \
-               result++;                                                \
-          } while(0)
+void __wait_for_logger(void) {
+     volatile int count = -1;
+     do {
+          count = ACCESS_ONCE(output_count);
+          usleep(10000);
+     } while (ACCESS_ONCE(output_count) > count);
+}
+
+int __assert(int test, const char *format, ...) {
+     int result = 0;
+     va_list arg;
+     if (!(test)) {
+          va_start(arg, format);
+          vfprintf(stderr, format, arg);
+          va_end(arg);
+          result++;
+     }
+     return result;
+}
+
+char *logger_data(void) {
+     return ACCESS_ONCE(output_data);
+}

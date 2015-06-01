@@ -14,14 +14,14 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "common/cron/yacad_cron.h"
+#include "test.h"
 
-#include "_test.c"
+#include "common/cron/yacad_cron.h"
 
 /**
  * Always gets the same "current minute"
  */
-static struct tm fake_gcm(void) {
+static struct tm mock_get_current_minute_fn(void) {
      time_t t;
      static struct tm result = {
           .tm_sec = 0,
@@ -56,7 +56,8 @@ static int run_test(const char *format, int min, int hour, int mday, int mon, in
      struct timeval tv;
      t = mktime(&expected);
      localtime_r(&t, &expected);
-     cron = yacad_cron_parse(get_logger(info, test_logger), format, fake_gcm);
+     set_get_current_minute_fn(mock_get_current_minute_fn);
+     cron = yacad_cron_parse(get_logger(trace), format);
 
      tv = cron->next(cron);
      localtime_r(&tv.tv_sec, &actual);
@@ -71,6 +72,5 @@ int test(void) {
      assert(run_test("10 * * * *", 10, 1, 1, 1, 2015));
      // TODO assert(run_test("1 * * * *", 1, 2, 1, 1, 2015));
 
-     wait_for_logger();
      return result;
 }

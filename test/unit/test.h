@@ -14,28 +14,26 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __YACAD_CRON_H__
-#define __YACAD_CRON_H__
+#ifndef __TEST_H__
+#define __TEST_H__
 
-#include "yacad.h"
-
-typedef struct yacad_cron_s yacad_cron_t;
-
-typedef struct timeval (*yacad_cron_next_fn)(yacad_cron_t *this);
-typedef void (*yacad_cron_free_fn)(yacad_cron_t *this);
-
-typedef struct tm (*get_current_minute_fn)(void);
-
-struct yacad_cron_s {
-     yacad_cron_next_fn next;
-     yacad_cron_free_fn free;
-};
-
-yacad_cron_t *yacad_cron_parse(logger_t log, const char *cronspec);
+#include <cad_shared.h>
 
 /**
- * Must be called before \ref yacad_cron_parse.
+ * The test to implement.
+ *
+ * @return the test status (0 is OK)
  */
-void set_get_current_minute_fn(get_current_minute_fn fn);
+int test(void);
 
-#endif /* __YACAD_CRON_H__ */
+int __assert(int test, const char *format, ...) __PRINTF__;
+void __wait_for_logger(void);
+
+#define assert(test) do { __wait_for_logger(); result += __assert((test), "**** ASSERT FAILED %s:%d: %s\n", __FILE__, __LINE__, #test); } while(0)
+
+/**
+ * Data written in the logger
+ */
+char *logger_data(void);
+
+#endif /* __TEST_H__ */
