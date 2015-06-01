@@ -23,15 +23,23 @@ count() {
 echo '# Statistics #'
 echo
 
-echo '# Header files #'
-(
-    cd src; count $(find . -name \*.h | sed 's|^\./||g')
-)
+while read dir name; do
+    echo "# $name files #"
 
-echo '# Source files #'
-(
-    cd src; count $(find . -name \*.c | sed 's|^\./||g')
-)
+    echo '## Header files ##'
+    (
+        cd src; count $(find $dir -name \*.h | sed 's|^\./||g')
+    )
+
+    echo '## Source files ##'
+    (
+        cd src; count $(find $dir -name \*.c | sed 's|^\./||g')
+    )
+done <<EOF
+common Common
+core Core
+runner Runner
+EOF
 
 echo '# Test files #'
 
