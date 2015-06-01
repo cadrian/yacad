@@ -20,15 +20,15 @@ count() {
 }
 
 #echo '\defgroup stats Statistics'
-echo '## Statistics'
+echo '# Statistics #'
 echo
 
-echo '### Header files'
+echo '# Header files #'
 (
     cd src; count $(find . -name \*.h | sed 's|^\./||g')
 )
 
-echo '### Source files'
+echo '# Source files #'
 (
     cd src; count $(find . -name \*.c | sed 's|^\./||g')
 )
