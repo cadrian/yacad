@@ -33,7 +33,9 @@ echo '# Source files #'
     cd src; count $(find . -name \*.c | sed 's|^\./||g')
 )
 
-#echo '### Test files'
-#(
-#    cd test; count *.[ch]
-#)
+echo '# Test files #'
+
+echo '## Unit tests ##'
+(
+    cd test/unit; count *.[ch]
+)
