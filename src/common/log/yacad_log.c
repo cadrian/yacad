@@ -32,6 +32,7 @@ static logger_fn current_logger_fn = serr;
 
 static bool_t do_log(yacad_zmq_poller_t *zpoller, yacad_zmq_socket_t *zscheduler, const char *message, void *data) {
      ((logger_fn)data)("%s\n", message);
+     zscheduler->send(zscheduler, "");
      return true;
 }
 
