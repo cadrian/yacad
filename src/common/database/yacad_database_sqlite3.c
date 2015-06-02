@@ -14,15 +14,29 @@
   along with yaCAD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <sqlite3.h>
-
-#include "yacad_database.h"
+#include "yacad_database_sqlite3.h"
 
 #define DB_VERSION 1L
 
 #define STMT_CREATE_TABLE "create table PARAM (KEY not null, VALUE not null)"
 #define STMT_SELECT "select VALUE from PARAM where KEY=?"
 #define STMT_INSERT "insert into PARAM (KEY,VALUE) values (?,?)"
+
+static sqlite3_fn_t sqlite3_fn = {
+     .errmsg              = sqlite3_errmsg           ,
+     .bind_int64          = sqlite3_bind_int64       ,
+     .bind_text64         = sqlite3_bind_text64      ,
+     .step                = sqlite3_step             ,
+     .last_insert_rowid   = sqlite3_last_insert_rowid,
+     .column_int64        = sqlite3_column_int64     ,
+     .column_text         = sqlite3_column_text      ,
+     .finalize            = sqlite3_finalize         ,
+     .prepare             = sqlite3_prepare_v2       ,
+     .close               = sqlite3_close            ,
+     .initialize          = sqlite3_initialize       ,
+     .open                = sqlite3_open_v2          ,
+     .exec                = sqlite3_exec             ,
+};
 
 static bool_t __sqlcheck(sqlite3 *db, logger_t log, int sqlerr, level_t level, const char *sqlaction, unsigned int line) {
      int result = true;
@@ -44,12 +58,14 @@ static bool_t __sqlcheck(sqlite3 *db, logger_t log, int sqlerr, level_t level, c
      return result;
 }
 
-#define sqlcheck(db, log, sqlaction, level) __sqlcheck(db, log, (sqlaction), (level), #sqlaction, __LINE__)
+#define sqlcheck0(db, log, sqlaction, level) __sqlcheck((db), (log), (sqlaction), (level), #sqlaction, __LINE__)
+#define sqlcheck(this, sqlaction, level) __sqlcheck((this)->db, (this)->log, (sqlaction), (level), #sqlaction, __LINE__)
 
 typedef struct yacad_database_impl_s {
      yacad_database_t fn;
      logger_t log;
      sqlite3 *db;
+     sqlite3_fn_t sql_fn;
 } yacad_database_impl_t;
 
 typedef struct yacad_statement_impl_s {
@@ -58,16 +74,17 @@ typedef struct yacad_statement_impl_s {
      sqlite3 *db;
      sqlite3_stmt *query;
      long rowid;
+     sqlite3_fn_t sql_fn;
 } yacad_statement_impl_t;
 
 static void bind_int(yacad_statement_impl_t *this, int index, long value) {
      this->log(trace, " - bind int #%d: %ld", index, value);
-     sqlcheck(this->db, this->log, sqlite3_bind_int64(this->query, index + 1, (sqlite3_int64)value), warn);
+     sqlcheck(this, this->sql_fn.bind_int64(this->query, index + 1, (sqlite3_int64)value), warn);
 }
 
 static void bind_string(yacad_statement_impl_t *this, int index, const char *value) {
      this->log(trace, " - bind string #%d: '%s'", index, value);
-     sqlcheck(this->db, this->log, sqlite3_bind_text64(this->query, index + 1, value, strlen(value), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
+     sqlcheck(this, this->sql_fn.bind_text64(this->query, index + 1, value, strlen(value), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
 }
 
 static void select_run(yacad_statement_impl_t *this, yacad_select_fn select, void *data) {
@@ -76,7 +93,7 @@ static void select_run(yacad_statement_impl_t *this, yacad_select_fn select, voi
 
      this->log(trace, " - executing select");
      do {
-          err = sqlite3_step(this->query);
+          err = this->sql_fn.step(this->query);
           switch(err) {
           case SQLITE_DONE:
                done = true;
@@ -92,7 +109,7 @@ static void select_run(yacad_statement_impl_t *this, yacad_select_fn select, voi
                }
                break;
           default:
-               sqlcheck(this->db, this->log, err, error);
+               sqlcheck(this, err, error);
                done = true;
           }
      } while (!done);
@@ -104,10 +121,10 @@ static void update_run(yacad_statement_impl_t *this, yacad_select_fn select, voi
 
      this->log(trace, " - executing update");
      do {
-          err = sqlite3_step(this->query);
+          err = this->sql_fn.step(this->query);
           switch(err) {
           case SQLITE_DONE:
-               this->rowid = (long)sqlite3_last_insert_rowid(this->db);
+               this->rowid = (long)this->sql_fn.last_insert_rowid(this->db);
                done = true;
                break;
           case SQLITE_BUSY:
@@ -116,13 +133,13 @@ static void update_run(yacad_statement_impl_t *this, yacad_select_fn select, voi
                break;
           case SQLITE_OK: // ??
           case SQLITE_ROW:
-               this->rowid = (long)sqlite3_last_insert_rowid(this->db);
+               this->rowid = (long)this->sql_fn.last_insert_rowid(this->db);
                if (select != NULL) {
                     select(I(this), data);
                }
                break;
           default:
-               sqlcheck(this->db, this->log, err, error);
+               sqlcheck(this, err, error);
                done = true;
           }
      } while (!done);
@@ -133,19 +150,19 @@ static long get_rowid(yacad_statement_impl_t *this) {
 }
 
 static long get_int(yacad_statement_impl_t *this, int index) {
-     long result = (long)sqlite3_column_int64(this->query, index);
+     long result = (long)this->sql_fn.column_int64(this->query, index);
      this->log(trace, " - int #%d = %ld", index, result);
      return result;
 }
 
 static const char *get_string(yacad_statement_impl_t *this, int index) {
-     char *result = (char *)sqlite3_column_text(this->query, index);
+     char *result = (char *)this->sql_fn.column_text(this->query, index);
      this->log(trace, " - string #%d = %s", index, result);
      return result;
 }
 
 static void free__(yacad_statement_impl_t *this) {
-     sqlcheck(this->db, this->log, sqlite3_finalize(this->query), warn);
+     sqlcheck(this, this->sql_fn.finalize(this->query), warn);
      free(this);
 }
 
@@ -197,38 +214,35 @@ static void set_installed(yacad_database_impl_t *this) {
      }
 }
 
-static yacad_statement_t *select_(yacad_database_impl_t *this, const char *statement) {
+static yacad_statement_impl_t *new_statement(yacad_database_impl_t *this, const char *statement) {
      yacad_statement_impl_t *result;
      sqlite3_stmt *query = NULL;
-     if (!sqlcheck(this->db, this->log, sqlite3_prepare_v2(this->db, statement, -1, &query, NULL), error)) {
+     if (!sqlcheck(this, this->sql_fn.prepare(this->db, statement, -1, &query, NULL), error)) {
           return NULL;
      }
      this->log(debug, "%s", statement);
      result = malloc(sizeof(yacad_statement_impl_t));
-     result->fn = select_fn;
      result->log = this->log;
      result->db = this->db;
      result->query = query;
+     result->sql_fn = this->sql_fn;
+     return result;
+}
+
+static yacad_statement_t *select_(yacad_database_impl_t *this, const char *statement) {
+     yacad_statement_impl_t *result = new_statement(this, statement);
+     result->fn = select_fn;
      return I(result);
 }
 
 static yacad_statement_t *update(yacad_database_impl_t *this, const char *statement) {
-     yacad_statement_impl_t *result;
-     sqlite3_stmt *query = NULL;
-     if (!sqlcheck(this->db, this->log, sqlite3_prepare_v2(this->db, statement, -1, &query, NULL), error)) {
-          return NULL;
-     }
-     this->log(debug, "%s", statement);
-     result = malloc(sizeof(yacad_statement_impl_t));
+     yacad_statement_impl_t *result = new_statement(this, statement);
      result->fn = update_fn;
-     result->log = this->log;
-     result->db = this->db;
-     result->query = query;
      return I(result);
 }
 
 static void free_(yacad_database_impl_t *this) {
-     sqlite3_close(this->db);
+     this->sql_fn.close(this->db);
      free(this);
 }
 
@@ -246,21 +260,21 @@ yacad_database_t *yacad_database_new(logger_t log, const char *database_name) {
      sqlite3 *db;
 
      if (!init) {
-          if (!sqlcheck(NULL, log, sqlite3_initialize(), debug)) {
+          if (!sqlcheck0(NULL, log, sqlite3_fn.initialize(), debug)) {
                log(error, "Could not initialize database: %s", database_name);
                return NULL;
           }
           init = true;
      }
 
-     if (!sqlcheck(NULL, log, sqlite3_open_v2(database_name, &db, SQLITE_OPEN_READWRITE, NULL), debug)) {
+     if (!sqlcheck0(NULL, log, sqlite3_fn.open(database_name, &db, SQLITE_OPEN_READWRITE, NULL), debug)) {
           log(debug, "Creating database: %s", database_name);
-          if (!sqlcheck(NULL, log, sqlite3_open_v2(database_name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL), debug)) {
+          if (!sqlcheck0(NULL, log, sqlite3_fn.open(database_name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL), debug)) {
                log(error, "Could not create database: %s", database_name);
                return NULL;
           }
           log(debug, "Creating table: PARAM");
-          if (!sqlcheck(db, log, sqlite3_exec(db, STMT_CREATE_TABLE, NULL, NULL, NULL), debug)) {
+          if (!sqlcheck0(db, log, sqlite3_fn.exec(db, STMT_CREATE_TABLE, NULL, NULL, NULL), debug)) {
                log(error, "Could not create table");
                sqlite3_close(db);
                return NULL;
@@ -270,6 +284,11 @@ yacad_database_t *yacad_database_new(logger_t log, const char *database_name) {
      result->fn = impl_fn;
      result->log = log;
      result->db = db;
+     result->sql_fn = sqlite3_fn;
 
      return I(result);
+}
+
+void yacad_database_set_sqlite_fn(sqlite3_fn_t fn) {
+     sqlite3_fn = fn;
 }
