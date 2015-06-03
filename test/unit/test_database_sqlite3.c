@@ -127,22 +127,41 @@ static sqlite3_fn_t mock_sqlite3 = {
      .exec              = mock_sqlite3_exec             ,
 };
 
-int test(void) {
+int test_creation(logger_t log) {
      int result = 0;
-     logger_t log = get_logger(trace);
      yacad_database_t *db;
 
-     yacad_database_set_sqlite_fn(mock_sqlite3);
-
-     //push_result(mock_sqlite3_errmsg, "mock_sqlite3_errmsg");
      push_result(mock_sqlite3_initialize, SQLITE_OK);
 
      expect_string(mock_sqlite3_open_v2, filename, "TESTDB");
+     expect_not(mock_sqlite3_open_v2, db, NULL);
+     expect(mock_sqlite3_open_v2, flags, SQLITE_OPEN_READWRITE);
+     expect(mock_sqlite3_open_v2, vfs, NULL);
+     push_result(mock_sqlite3_open_v2, SQLITE_ERROR); // the database does not exist
+
+     expect_string(mock_sqlite3_open_v2, filename, "TESTDB");
+     expect_not(mock_sqlite3_open_v2, db, NULL);
+     expect(mock_sqlite3_open_v2, flags, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE);
+     expect(mock_sqlite3_open_v2, vfs, NULL);
+     push_result(mock_sqlite3_open_v2, SQLITE_ERROR); // the database could not be created
+
+     push_result(mock_sqlite3_close, SQLITE_OK);
 
      db = yacad_database_new(log, "TESTDB");
-     db->free(db);
+     assert(db == NULL);
+     //db->free(db);
 
      verify_mocks();
+     return result;
+}
+
+int test(void) {
+     int result = 0;
+     logger_t log = get_logger(trace);
+
+     yacad_database_set_sqlite_fn(mock_sqlite3);
+
+     result += test_creation(log);
 
      return result;
 }
