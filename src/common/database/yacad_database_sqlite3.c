@@ -38,7 +38,7 @@ static sqlite3_fn_t sqlite3_fn = {
      .exec                = sqlite3_exec             ,
 };
 
-static bool_t __sqlcheck(sqlite3 *db, logger_t log, int sqlerr, level_t level, const char *sqlaction, unsigned int line) {
+static bool_t __sqlcheck(sqlite3 *db, logger_t log, sqlite3_fn_t *sql_fn, int sqlerr, level_t level, const char *sqlaction, unsigned int line) {
      int result = true;
      const char *msg;
      char *paren;
@@ -47,7 +47,7 @@ static bool_t __sqlcheck(sqlite3 *db, logger_t log, int sqlerr, level_t level, c
           log(debug, "Error line %u: %s", line, sqlaction);
           paren = strchrnul(sqlaction, '(');
           len = paren - sqlaction;
-          msg = db == NULL ? NULL : sqlite3_errmsg(db);
+          msg = db == NULL ? NULL : sql_fn->errmsg(db);
           if (msg == NULL) {
                log(level, "%.*s: error %d", len, sqlaction, sqlerr);
           } else {
@@ -58,14 +58,15 @@ static bool_t __sqlcheck(sqlite3 *db, logger_t log, int sqlerr, level_t level, c
      return result;
 }
 
-#define sqlcheck0(db, log, sqlaction, level) __sqlcheck((db), (log), (sqlaction), (level), #sqlaction, __LINE__)
-#define sqlcheck(this, sqlaction, level) __sqlcheck((this)->db, (this)->log, (sqlaction), (level), #sqlaction, __LINE__)
+#define sqlcheck0(db, log, sqlaction, level) __sqlcheck((db), (log), &sqlite3_fn, (sqlaction), (level), #sqlaction, __LINE__)
+#define sqlcheck(this, sqlaction, level) __sqlcheck((this)->db, (this)->log, (this)->sql_fn, (sqlaction), (level), #sqlaction, __LINE__)
 
 typedef struct yacad_database_impl_s {
      yacad_database_t fn;
      logger_t log;
      sqlite3 *db;
-     sqlite3_fn_t sql_fn;
+     sqlite3_fn_t *sql_fn; // points to sql_fn_copy
+     sqlite3_fn_t sql_fn_copy;
 } yacad_database_impl_t;
 
 typedef struct yacad_statement_impl_s {
@@ -74,17 +75,17 @@ typedef struct yacad_statement_impl_s {
      sqlite3 *db;
      sqlite3_stmt *query;
      long rowid;
-     sqlite3_fn_t sql_fn;
+     sqlite3_fn_t *sql_fn;
 } yacad_statement_impl_t;
 
 static void bind_int(yacad_statement_impl_t *this, int index, long value) {
      this->log(trace, " - bind int #%d: %ld", index, value);
-     sqlcheck(this, this->sql_fn.bind_int64(this->query, index + 1, (sqlite3_int64)value), warn);
+     sqlcheck(this, this->sql_fn->bind_int64(this->query, index + 1, (sqlite3_int64)value), warn);
 }
 
 static void bind_string(yacad_statement_impl_t *this, int index, const char *value) {
      this->log(trace, " - bind string #%d: '%s'", index, value);
-     sqlcheck(this, this->sql_fn.bind_text64(this->query, index + 1, value, strlen(value), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
+     sqlcheck(this, this->sql_fn->bind_text64(this->query, index + 1, value, strlen(value), SQLITE_TRANSIENT, SQLITE_UTF8), warn);
 }
 
 static void select_run(yacad_statement_impl_t *this, yacad_select_fn select, void *data) {
@@ -93,7 +94,7 @@ static void select_run(yacad_statement_impl_t *this, yacad_select_fn select, voi
 
      this->log(trace, " - executing select");
      do {
-          err = this->sql_fn.step(this->query);
+          err = this->sql_fn->step(this->query);
           switch(err) {
           case SQLITE_DONE:
                done = true;
@@ -121,10 +122,10 @@ static void update_run(yacad_statement_impl_t *this, yacad_select_fn select, voi
 
      this->log(trace, " - executing update");
      do {
-          err = this->sql_fn.step(this->query);
+          err = this->sql_fn->step(this->query);
           switch(err) {
           case SQLITE_DONE:
-               this->rowid = (long)this->sql_fn.last_insert_rowid(this->db);
+               this->rowid = (long)this->sql_fn->last_insert_rowid(this->db);
                done = true;
                break;
           case SQLITE_BUSY:
@@ -133,7 +134,7 @@ static void update_run(yacad_statement_impl_t *this, yacad_select_fn select, voi
                break;
           case SQLITE_OK: // ??
           case SQLITE_ROW:
-               this->rowid = (long)this->sql_fn.last_insert_rowid(this->db);
+               this->rowid = (long)this->sql_fn->last_insert_rowid(this->db);
                if (select != NULL) {
                     select(I(this), data);
                }
@@ -150,19 +151,19 @@ static long get_rowid(yacad_statement_impl_t *this) {
 }
 
 static long get_int(yacad_statement_impl_t *this, int index) {
-     long result = (long)this->sql_fn.column_int64(this->query, index);
+     long result = (long)this->sql_fn->column_int64(this->query, index);
      this->log(trace, " - int #%d = %ld", index, result);
      return result;
 }
 
 static const char *get_string(yacad_statement_impl_t *this, int index) {
-     char *result = (char *)this->sql_fn.column_text(this->query, index);
+     char *result = (char *)this->sql_fn->column_text(this->query, index);
      this->log(trace, " - string #%d = %s", index, result);
      return result;
 }
 
 static void free__(yacad_statement_impl_t *this) {
-     sqlcheck(this, this->sql_fn.finalize(this->query), warn);
+     sqlcheck(this, this->sql_fn->finalize(this->query), warn);
      free(this);
 }
 
@@ -217,7 +218,7 @@ static void set_installed(yacad_database_impl_t *this) {
 static yacad_statement_impl_t *new_statement(yacad_database_impl_t *this, const char *statement) {
      yacad_statement_impl_t *result;
      sqlite3_stmt *query = NULL;
-     if (!sqlcheck(this, this->sql_fn.prepare(this->db, statement, -1, &query, NULL), error)) {
+     if (!sqlcheck(this, this->sql_fn->prepare(this->db, statement, -1, &query, NULL), error)) {
           return NULL;
      }
      this->log(debug, "%s", statement);
@@ -242,7 +243,7 @@ static yacad_statement_t *update(yacad_database_impl_t *this, const char *statem
 }
 
 static void free_(yacad_database_impl_t *this) {
-     this->sql_fn.close(this->db);
+     this->sql_fn->close(this->db);
      free(this);
 }
 
@@ -284,7 +285,8 @@ yacad_database_t *yacad_database_new(logger_t log, const char *database_name) {
      result->fn = impl_fn;
      result->log = log;
      result->db = db;
-     result->sql_fn = sqlite3_fn;
+     result->sql_fn_copy = sqlite3_fn;
+     result->sql_fn = &(result->sql_fn_copy);
 
      return I(result);
 }
