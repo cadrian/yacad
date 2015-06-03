@@ -124,12 +124,18 @@ void *__mock_pop_result(const char *fun) {
      return result;
 }
 
-bool_t __mock_compare_values(const void *expected, const void *actual) {
-     return expected == actual;
+bool_t __mock_same_values(const void *expected, const void *actual, size_t size) {
+     return !memcmp(expected, actual, size);
 }
 
-bool_t __mock_compare_strings(const void *expected, const void *actual) {
-     return actual != NULL && !strcmp(expected, actual);
+bool_t __mock_same_strings(const void *expected, const void *actual, size_t size) {
+     char **e = (char**)expected;
+     char **a = (char**)actual;
+     return actual != NULL && !strcmp(*e, *a);
+}
+
+bool_t __mock_different_values(const void *expected, const void *actual, size_t size) {
+     return !!memcmp(expected, actual, size);
 }
 
 void __mock_expect(const char *fun, const char *param, size_t size, const void *expected, mock_comparator_fn cmp) {
@@ -147,6 +153,33 @@ void __mock_expect(const char *fun, const char *param, size_t size, const void *
      mock->params->set(mock->params, param, value);
 }
 
+static char *content(const void *data, size_t size) {
+     static char *result = NULL;
+     static int capacity = 0;
+     char *fmt;
+     const char *value = (const char *)data;
+     int i, n, count;
+     if (capacity == 0) {
+          result = malloc(capacity = 4096);
+     }
+     count = 0;
+     fmt = "[%02x";
+     for (i = 0; i < size; i++) {
+          n = snprintf("", 0, fmt, value[i]);
+          if (n > capacity - count - 2) {
+               do {
+                    capacity *= 2;
+               } while (n > capacity - count);
+               result = realloc(result, capacity);
+          }
+          n = snprintf(result + count, capacity - count, fmt, value[i]);
+          count += n;
+          fmt = " %02x";
+     }
+     snprintf(result + count, capacity - count, "]");
+     return result;
+}
+
 void __mock_check(const char *fun, const char *param, size_t size, const void *actual) {
      mock_t *mock = get_mock_check(fun);
      mock_param_t *value;
@@ -155,8 +188,10 @@ void __mock_check(const char *fun, const char *param, size_t size, const void *a
      if (mock != NULL && mock->params != NULL) {
           value = mock->params->get(mock->params, param);
           if (value != NULL) {
-               if (!value->cmp(value->data, actual)) {
-                    fprintf(stderr, "**** Value mismatch for %s in %s\n", param, fun);
+               if (!value->cmp(value->data, actual, size)) {
+                    fprintf(stderr, "**** Value mismatch for %s [%lu] in %s\n", param, (unsigned long)size, fun);
+                    fprintf(stderr, "     - expected: %s\n", content(value->data, size));
+                    fprintf(stderr, "     - actual:   %s\n", content(actual, size));
                     failed_mocks_count++;
                }
                checked = true;

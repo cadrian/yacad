@@ -19,15 +19,28 @@
 
 #include <yacad.h>
 
-typedef bool_t (*mock_comparator_fn)(const void *expected, const void *actual);
+typedef bool_t (*mock_comparator_fn)(const void *expected, const void *actual, size_t size);
 
 /**
  * When preparing the tests, call the expect functions first
  */
 
-#define expect(fun, name, value) __mock_expect(#fun, #name, sizeof(value), &(value), __mock_compare_values)
-#define expect_cmp(fun, name, value, cmp) __mock_expect(#fun, #name, sizeof(value), &(value), cmp)
-#define expect_string(fun, name, value) __mock_expect(#fun, #name, sizeof(value), &(value), __mock_compare_strings)
+#define expect(fun, name, value) do {                                   \
+          __auto_type v = (value);                                      \
+          __mock_expect(#fun, #name, sizeof(value), &v, __mock_same_values); \
+     } while(0)
+#define expect_not(fun, name, value) do {                               \
+          __auto_type v = (value);                                      \
+          __mock_expect(#fun, #name, sizeof(value), &v, __mock_different_values); \
+     } while(0)
+#define expect_cmp(fun, name, value, cmp)  do {                         \
+          __auto_type v = (value);                                      \
+          __mock_expect(#fun, #name, sizeof(value), &v, cmp);           \
+     } while(0)
+#define expect_string(fun, name, value)  do {                           \
+          __auto_type v = (value);                                      \
+          __mock_expect(#fun, #name, sizeof(value), &v, __mock_same_strings); \
+     } while(0)
 #define check(name) __mock_check(__func__, #name, sizeof(name), &(name))
 
 /**
@@ -43,8 +56,9 @@ typedef bool_t (*mock_comparator_fn)(const void *expected, const void *actual);
 #define result(type) (*(type*)(__mock_pop_result(__func__)))
 #define no_result() ((void)(__mock_pop_result(__func__)))
 
-bool_t __mock_compare_values(const void *expected, const void *actual);
-bool_t __mock_compare_strings(const void *expected, const void *actual);
+bool_t __mock_same_values(const void *expected, const void *actual, size_t size);
+bool_t __mock_same_strings(const void *expected, const void *actual, size_t size);
+bool_t __mock_different_values(const void *expected, const void *actual, size_t size);
 
 void __mock_expect(const char *fun, const char *param, size_t size, const void *expected, mock_comparator_fn cmp);
 void __mock_check(const char *fun, const char *param, size_t size, const void *actual);
